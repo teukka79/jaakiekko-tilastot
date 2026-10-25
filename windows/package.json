@@ -1,0 +1,52 @@
+{
+  "name": "jaakiekko-pisteporssi",
+  "productName": "Jääkiekon Pistepörssi",
+  "version": "1.0.0",
+  "description": "Jääkiekon Pistepörssi 2026/2027",
+  "main": "main.js",
+  "author": "Teukka",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "build": {
+    "appId": "fi.teukka.JaakiekkoTilastot",
+    "productName": "Jääkiekon Pistepörssi",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "icons/Icon?.png",
+      "icons/icon512.png",
+      "package.json"
+    ],
+    "win": {
+      "icon": "icons/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "shortcutName": "Jääkiekon Pistepörssi",
+      "language": "1035",
+      "installerIcon": "icons/icon.ico",
+      "uninstallerIcon": "icons/icon.ico",
+      "installerHeaderIcon": "icons/icon.ico"
+    },
+    "afterPack": "afterPack.js",
+    "artifactName": "Jaakiekon-Pisteporssi-Asennus-${version}.${ext}"
+  },
+  "devDependencies": {
+    "country-flag-emoji-polyfill": "^0.1.10",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "resedit": "^2.0.3"
+  }
+}

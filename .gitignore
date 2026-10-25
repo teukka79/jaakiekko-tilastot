@@ -1,0 +1,10 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+Claude outputs/
+_to_delete/
+Windows-lahdekoodi.zip
+windows/node_modules/
+windows/dist/

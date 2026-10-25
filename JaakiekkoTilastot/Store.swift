@@ -198,12 +198,13 @@ final class AppStore {
     var liigaStatus = "Liiga: ei haettu"
     var ahlStatus = "AHL: ei haettu"
     var mestisStatus = "Mestis: ei haettu"
+    var sweStatus = "SHL/HA: ei haettu"
     var epStatus = "SHL/HA: ei haettu"
     var hasEPKey = Keychain.get("eliteprospects") != nil
     private var lastEPFetch: Date?
     /// SHL/HA näkyy yläpalkissa vain onnistuneen haun jälkeen; virheet näkyvät Asetukset-ikkunassa.
     var epOK: Bool { epStatus.contains("päivitetty") || epStatus.contains("tallennettu") }
-    var liveStatus: String { nhlStatus + " · " + liigaStatus + " · " + ahlStatus + " · " + mestisStatus + (hasEPKey && epOK ? " · " + epStatus : "") }
+    var liveStatus: String { nhlStatus + " · " + liigaStatus + " · " + ahlStatus + " · " + mestisStatus + " · " + sweStatus + (hasEPKey && epOK ? " · " + epStatus : "") }
     var isRefreshing = false
     var toast: String?
 
@@ -219,6 +220,9 @@ final class AppStore {
         if let ts = state.liveEP?.values.map(\.timestamp).max() {
             epStatus = "SHL/HA tallennettu " + AppStore.timeString(ts)
             lastEPFetch = ts
+        }
+        if let ts = state.liveSwe?.values.map(\.timestamp).max() {
+            sweStatus = "SHL/HA tallennettu " + AppStore.timeString(ts)
         }
         if let ts = state.liveMestis?.timestamp {
             mestisStatus = "Mestis tallennettu " + AppStore.timeString(ts)
@@ -342,6 +346,25 @@ final class AppStore {
                 p.games = e.games; p.goals = e.goals; p.assists = e.assists
                 p.pim = e.pim; p.plusMinus = e.plusMinus
             }
+            if p.league == .shl || p.league == .allsvenskan, let sw = state.liveSwe?[p.league.rawValue] {
+                let w = sw.byName[AppStore.norm(p.name)]?.first(where: { $0.team == p.team })
+                let goalie = (w?.pos ?? p.pos) == "G"
+                if let w {
+                    if let n = w.number { p.number = n }
+                    if p.slot == nil { p.slot = w.slot }
+                    if p.pos == nil { p.pos = w.pos }
+                    if p.nat == nil { p.nat = w.nat }
+                    if p.born == nil, let y = w.born?.prefix(4), let yi = Int(y) { p.born = yi }
+                }
+                p.goals = w?.goals ?? 0
+                p.assists = w?.assists ?? 0
+                p.ppPoints = w?.ppPoints ?? 0
+                if let w { p.pim = w.pim }
+                p.plusMinus = goalie ? nil : (w?.plusMinus ?? p.plusMinus)
+                if p.games == nil || state.liveEP?[p.league.rawValue]?.byName[AppStore.norm(p.name)] == nil {
+                    p.games = sw.teamGames[p.team] ?? p.games
+                }
+            }
             if let lv = liveFor(p) {
                 p.games = lv.entry.games; p.goals = lv.entry.goals; p.assists = lv.entry.assists
                 p.pim = lv.entry.pim; p.plusMinus = lv.entry.plusMinus
@@ -385,6 +408,24 @@ final class AppStore {
                     p.number = snap.info?[key]?.number
                     p.nat = snap.info?[key]?.nat
                     out.append(p)
+                }
+            }
+        }
+        for lg in [League.shl, League.allsvenskan] {
+            guard let sw = state.liveSwe?[lg.rawValue] else { continue }
+            for (key, list) in sw.byName {
+                for e in list where e.goals + e.assists > 0 {
+                    let tag = "\(lg.rawValue)|\(key)"
+                    guard !have.contains(tag), let team = teamByName[e.team] else { continue }
+                    have.insert(tag)
+                    var sp = Player(id: "swe-\(lg.rawValue)-\(key)", name: e.name, team: team.name, league: lg, flag: team.flag,
+                                    pos: e.pos, nat: e.nat, born: e.born.flatMap { Int($0.prefix(4)) }, shoots: nil,
+                                    games: sw.teamGames[team.name], goals: e.goals, assists: e.assists,
+                                    pim: e.pim, plusMinus: e.pos == "G" ? nil : e.plusMinus)
+                    sp.slot = e.slot
+                    sp.ppPoints = e.ppPoints
+                    sp.number = e.number
+                    out.append(sp)
                 }
             }
         }
@@ -454,6 +495,7 @@ final class AppStore {
         if let s = state.logos[teamName], let u = URL(string: s) { return u }
         if let s = state.autoLogos?[teamName], let u = URL(string: s) { return u }
         if let s = StaticLogos.urls[teamName], let u = URL(string: s) { return u }
+        if let s = ExtraLogos.urls[teamName], let u = URL(string: s) { return u }
         return teamByName[teamName]?.defaultLogoURL
     }
 
@@ -583,6 +625,7 @@ final class AppStore {
         await refreshLiiga()
         await refreshAHL()
         await refreshMestis()
+        await refreshSwe()
         notifyArmed = true
         if hasEPKey, force || lastEPFetch == nil || Date().timeIntervalSince(lastEPFetch ?? .distantPast) > 7200 {
             await refreshEP()
@@ -653,6 +696,10 @@ final class AppStore {
     /// Soittaa ilmoitusäänen (oma ääni, jos valittu; muuten järjestelmän oletusääni).
     func playNotificationSound() {
         if let u = customSoundURL, let s = NSSound(contentsOf: u, byReference: false) {
+            goalSound?.stop()
+            goalSound = s
+            s.play()
+        } else if let b = Bundle.main.url(forResource: "notifica_diretta", withExtension: "mp3"), let s = NSSound(contentsOf: b, byReference: false) {
             goalSound?.stop()
             goalSound = s
             s.play()
@@ -1021,6 +1068,42 @@ final class AppStore {
         }
     }
 
+    /// SHL/HockeyAllsvenskan: pelaajatilastot Swehockeyn ottelutapahtumista. Päättyneet ottelut haetaan vain kerran.
+    private func refreshSwe() async {
+        sweStatus = "Päivitetään SHL/HA…"
+        var snaps = state.liveSwe ?? [:]
+        var allEvents = state.sweEvents ?? [:]
+        var ok = 0
+        for lg in [League.shl, League.allsvenskan] {
+            guard let games = await fetchSweGames(league: lg, teams: teams) else { continue }
+            let roster = await fetchSweRoster(league: lg, teams: teams) ?? [:]
+            var cache = allEvents[lg.rawValue] ?? [:]
+            let todo: [(String, Int)] = games.compactMap { g in
+                guard g.final, let gid = g.gid, cache[gid] == nil else { return nil }
+                return (gid, g.hs + g.aw)
+            }
+            let fetched = await fetchSweEventsBatch(todo)
+            for (k, v) in fetched { cache[k] = v }
+            allEvents[lg.rawValue] = cache
+            let snap = aggregateSwe(league: lg, teams: teams, games: games, cache: cache, roster: roster)
+            if snap.teamGames.isEmpty { continue }
+            snaps[lg.rawValue] = snap
+            state.liveSwe = snaps
+            state.sweEvents = allEvents
+            persist()
+            rebuild()
+            ok += 1
+        }
+        recentCache.removeAll()
+        if ok > 0 {
+            sweStatus = "SHL/HA päivitetty " + AppStore.timeString(Date())
+        } else if let ts = state.liveSwe?.values.map(\.timestamp).max() {
+            sweStatus = "SHL/HA: ei yhteyttä, tallennettu " + AppStore.timeString(ts)
+        } else {
+            sweStatus = "SHL/HA: ei yhteyttä"
+        }
+    }
+
     // MARK: Liekki (pisteitä neljässä viimeisessä pelissä)
 
     func isHot(_ p: Player) -> Bool {
@@ -1028,6 +1111,7 @@ final class AppStore {
         switch p.league {
         case .nhl: return state.live?.hot?.contains(k) ?? false
         case .liiga: return state.liveLiiga?.hot?.contains(k) ?? false
+        case .shl, .allsvenskan: return state.liveSwe?[p.league.rawValue]?.hot.contains(p.team + "|" + k) ?? false
         default: return false
         }
     }
@@ -1134,7 +1218,15 @@ final class AppStore {
             } else {
                 result.note = "Pelaajan sivua ei ole vielä haettu. Paina Päivitä ja avaa pelaaja uudelleen."
             }
-        case .ahl, .shl, .allsvenskan:
+        case .shl, .allsvenskan:
+            if let sw = state.liveSwe?[p.league.rawValue], let tl = sw.teamRecent[p.team], !tl.isEmpty {
+                let mine = sw.recent[p.team + "|" + AppStore.norm(p.name)] ?? []
+                result.games = tl.map { tg in mine.first(where: { $0.id == tg.id }) ?? tg }
+                result.note = "Swehockey: joukkueen viimeiset 5 ottelua. Laukauksia ei saada pelaajakohtaisesti, eikä poissaolo erotu pisteettömästä ottelusta."
+            } else {
+                result.note = "SHL/HA-pelaajatietoja ei ole vielä haettu. Paina Päivitä."
+            }
+        case .ahl:
             result.note = "Pelikohtaisia tietoja ei ole saatavilla tälle sarjalle."
         }
         if result.note == nil || !result.games.isEmpty { recentCache[p.id] = (Date(), result) }

@@ -225,7 +225,7 @@ struct ScheduleView: View {
                     .buttonStyle(.plain).foregroundStyle(Theme.muted)
             }
             HStack(spacing: 8) {
-                ForEach([League.nhl, League.ahl, League.liiga, League.mestis]) { l in
+                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan]) { l in
                     Button(l.label) { league = l }.buttonStyle(GhostButtonStyle(active: league == l))
                 }
                 Spacer()
@@ -326,6 +326,7 @@ struct ScheduleView: View {
         case .nhl: r = await fetchNHLSchedule(teams: store.teams)
         case .mestis: r = await fetchMestisSchedule(teams: store.teams)
         case .ahl: r = await fetchAHLSchedule(teams: store.teams)
+        case .shl, .allsvenskan: r = await fetchSweSchedule(league: league, teams: store.teams)
         default: r = await fetchLiigaSchedule(teams: store.teams)
         }
         if let r { games = r } else if !silent { failed = true }

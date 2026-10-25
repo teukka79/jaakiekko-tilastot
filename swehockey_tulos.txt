@@ -1,0 +1,98 @@
+== 1. Etusivu ==
+pituus 98383
+   /ScheduleAndResults/Overview/20961 | SHL
+   /ScheduleAndResults/Overview/20962 | HockeyAllsvenskan
+   /ScheduleAndResults/Live/21041 | Hockeyettan
+   /ScheduleAndResults/Overview/21969 | Svenska Universitetshockeyligan
+   /ScheduleAndResults/Schedule/19767 | Svenska Cupen U20
+   /ScheduleAndResults/Live/20964 | U20 Nationell
+   /ScheduleAndResults/Overview/19937 | U18 Nationell
+   /ScheduleAndResults/Schedule/17795 | U16 SM-slutspel
+   /ScheduleAndResults/Live/21877 | TV-pucken Pojkar
+   /ScheduleAndResults/Overview/20960 | SDHL
+   /ScheduleAndResults/Live/20958 | NDHL
+   /ScheduleAndResults/Overview/21000 | U19 Nationell
+   /ScheduleAndResults/Live/21931 | TV-pucken Flickor
+   /ScheduleAndResults/Overview/21138 | Preseason Games Herr
+   /ScheduleAndResults/Overview/21139 | Preseason Games U20H
+   /ScheduleAndResults/Overview/21152 | Camps
+   /ScheduleAndResults/Overview/21137 | Preseason Games Dam
+   /ScheduleAndResults/Overview/21971 | Preseason Games U19 D
+   /ScheduleAndResults/Schedule/10318 | Tre Kronor
+   /ScheduleAndResults/Overview/21449 | U20
+   /ScheduleAndResults/Overview/19392 | U18
+   /ScheduleAndResults/Overview/20544 | U19
+   /ScheduleAndResults/Schedule/13443 | U17
+   /ScheduleAndResults/Overview/17760 | U16
+   /ScheduleAndResults/Overview/20913 | Tre Kronor Legends
+   /ScheduleAndResults/Overview/21751 | U18
+   /ScheduleAndResults/Overview/22178 | Damkronorna
+   /ScheduleAndResults/Overview/15940 | U16
+   /ScheduleAndResults/Live/21213 | HockeyTvåan
+   /ScheduleAndResults/Overview/21091 | Preseason
+   /ScheduleAndResults/Live/21404 | HockeyTrean
+   /ScheduleAndResults/Overview/21143 | U20 Regional
+   /ScheduleAndResults/Overview/21566 | U20 Div 1
+   /ScheduleAndResults/Live/21225 | U18 Div 1
+   /ScheduleAndResults/Live/22182 | U18 Regional
+   /ScheduleAndResults/Live/21562 | U18 Div 2
+   /ScheduleAndResults/Overview/21144 | U16 Regional
+   /ScheduleAndResults/Schedule/22287 | U16 Scandinavium Cup
+   /ScheduleAndResults/Overview/20437 | U16 SM-kval
+   /ScheduleAndResults/Overview/20562 | Distriktslag
+
+== 2. Sarja 20961 (SHL) ==
+/ScheduleAndResults/Schedule/20961 pituus 374598
+    Date | Time | Game | Result | Spectators | Venue
+    2026-09-19 | 2026-09-19 15:15 | 15:15 | Frölunda HC - Växjö Lakers HC | 5 - 4 | (1-1, 2-1, 2-2) | 12044 | Scandinavium
+    15:15 | 15:15 | HV 71 - IF Malmö Redhawks | 4 - 5 | (2-0, 1-3, 1-1, 0-1) | 6800 | Husqvarna Garden
+    15:15 | 15:15 | Linköping HC - Timrå IK | 3 - 2 | (1-0, 2-2, 0-0) | 7900 | Saab Arena
+    18:00 | 18:00 | Djurgårdens IF - IF Björklöven | 0 - 3 | (0-1, 0-1, 0-1) | 14100 | Avicii Arena
+    18:00 | 18:00 | Färjestad BK - Örebro HK | 7 - 0 | (4-0, 2-0, 1-0) | 8250 | Löfbergs Arena
+    18:00 | 18:00 | Luleå HF - Rögle BK | 4 - 2 | (0-2, 3-0, 1-0) | 6150 | Coop Norrbotten Arena
+    15:15 | 15:15 | Skellefteå AIK - Brynäs IF | 7 - 2 | (2-1, 4-1, 1-0) | 5801 | Skellefteå Kraft Arena
+    2026-09-22 | 2026-09-22 19:00 | 19:00 | Frölunda HC - Färjestad BK | 3 - 2 | (1-1, 0-1, 1-0, 0-0, 1-0) | 11449 | Scandinavium
+    19:00 | 19:00 | Linköping HC - Brynäs IF | 2 - 9 | (0-2, 1-3, 1-4) | 6812 | Saab Arena
+    19:00 | 19:00 | Rögle BK - Djurgårdens IF | 3 - 1 | (0-0, 2-1, 1-0) | 6310 | Catena Arena
+    19:00 | 19:00 | Timrå IK - Örebro HK | 1 - 5 | (1-1, 0-1, 0-3) | 5201 | SCA Arena
+/ScheduleAndResults/Overview/20961 pituus 122279
+    Date | Game | Result | Spectators | Venue
+    2026-10-22 | IF Björklöven - IF Malmö Redhawks | 2 - 4 | (1-2, 1-1, 0-1) | 5081 | Visionite Arena
+    2026-10-22 | Rögle BK - Frölunda HC | 4 - 1 | (0-0, 3-0, 1-1) | 6310 | Catena Arena
+    2026-10-22 | Skellefteå AIK - Djurgårdens IF | 4 - 1 | (1-1, 1-0, 2-0) | 5131 | Skellefteå Kraft Arena
+    2026-10-22 | Timrå IK - Färjestad BK | 0 - 4 | (0-1, 0-1, 0-2) | 4408 | SCA Arena
+    2026-10-22 | Växjö Lakers HC - Luleå HF | 2 - 1 | (0-0, 1-0, 1-1) | 5076 | Vida Arena
+    2026-10-22 | Örebro HK - Brynäs IF | 3 - 2 | (0-0, 2-1, 1-1) | 5500 | Behrn Arena
+    2026-10-24 | IF Björklöven - Skellefteå AIK | 1 - 8 | (0-3, 0-2, 1-3) | 5400 | Visionite Arena
+    2026-10-24 | IF Malmö Redhawks - Timrå IK | 1 - 2 | (0-1, 1-0, 0-1) | 9436 | Malmö Arena
+    2026-10-24 | Brynäs IF - Rögle BK | 4 - 5 | (0-2, 2-1, 2-1, 0-1) | 7792 | Monitor ERP Arena
+    2026-10-24 | HV 71 - Frölunda HC | 2 - 6 | (2-2, 0-4, 0-0) | 6800 | Husqvarna Garden
+    2026-10-24 | Luleå HF - Djurgårdens IF | 2 - 3 | (0-0, 1-1, 1-1, 0-1) | 6150 | Coop Norrbotten Arena
+
+== 2. Sarja 20962 (HockeyAllsvenskan) ==
+/ScheduleAndResults/Schedule/20962 pituus 377537
+    Date | Time | Game | Result | Spectators | Venue
+    2026-09-18 | 2026-09-18 19:00 | 19:00 | AIK - MoDo Hockey | 1 - 3 | (0-0, 0-2, 1-1) | 13950 | Avicii Arena
+    19:00 | 19:00 | Leksands IF - Södertälje SK | 2 - 1 | (2-0, 0-0, 0-1) | 7650 | Tegera Arena
+    19:00 | 19:00 | Västerås IK - Almtuna IS | 2 - 3 | (0-1, 1-0, 1-2) | 2929 | ABB Arena Nord
+    19:00 | 19:00 | BIK Karlskoga - Kalmar HC | 3 - 4 | (1-1, 1-2, 1-1) | 2704 | Nobelhallen
+    19:00 | 19:00 | Östersunds IK - Mora IK | 5 - 4 | (1-1, 1-2, 2-1, 0-0, 1-0) | 1887 | Östersund Arena Hall A
+    19:00 | 19:00 | Nybro Vikings IF - Vimmerby HC | 7 - 6 | (1-1, 3-2, 2-3, 0-0, 1-0) | 2249 | Liljas Arena
+    20:00 | 20:00 | IK Oskarshamn - Visby/Roma HK | 6 - 3 | (1-1, 2-0, 3-2) | 3275 | Be-Ge Hockey Center
+    2026-09-19 | 2026-09-19 15:00 | 15:00 | Almtuna IS - MoDo Hockey | 4 - 5 | (1-2, 1-1, 2-1, 0-0, 0-1) | 2107 | Gränby Ishallar A-hall
+    18:00 | 18:00 | BIK Karlskoga - Västerås IK | 3 - 2 | (2-0, 1-1, 0-1) | 2623 | Nobelhallen
+    20:30 | 20:30 | Mora IK - Leksands IF | 0 - 4 | (0-1, 0-2, 0-1) | 4500 | Wibe Arena
+    2026-09-20 | 2026-09-20 14:00 | 14:00 | Södertälje SK - Visby/Roma HK | 6 - 2 | (2-0, 3-1, 1-1) | 5231 | Scaniarinken
+/ScheduleAndResults/Overview/20962 pituus 123650
+    Date | Game | Result | Spectators | Venue
+    2026-10-21 | Leksands IF - Kalmar HC | 3 - 6 | (1-2, 0-3, 2-1) | 3953 | Tegera Arena
+    2026-10-21 | MoDo Hockey - IK Oskarshamn | 4 - 3 | (0-2, 2-0, 1-1, 1-0) | 2909 | Hägglunds Arena
+    2026-10-21 | Södertälje SK - BIK Karlskoga | 3 - 0 | (0-0, 2-0, 1-0) | 3046 | Scaniarinken
+    2026-10-21 | Mora IK - Almtuna IS | 6 - 0 | (5-0, 0-0, 1-0) | 1102 | Wibe Arena
+    2026-10-21 | Nybro Vikings IF - Visby/Roma HK | 1 - 0 | (0-0, 1-0, 0-0) | 1640 | Liljas Arena
+    2026-10-21 | Östersunds IK - AIK | 2 - 1 | (0-0, 0-1, 1-0, 0-0, 1-0) | 1572 | Östersund Arena Hall A
+    2026-10-21 | Vimmerby HC - Västerås IK | 0 - 3 | (0-1, 0-1, 0-1) | 912 | VBO Arena
+    2026-10-23 | MoDo Hockey - AIK | 3 - 4 | (0-1, 1-1, 2-1, 0-1) | 5366 | Hägglunds Arena
+    2026-10-23 | BIK Karlskoga - Visby/Roma HK | 3 - 1 | (1-0, 0-0, 2-1) | 2360 | Nobelhallen
+    2026-10-23 | IK Oskarshamn - Mora IK | 2 - 5 | (1-1, 1-2, 0-2) | 2200 | Be-Ge Hockey Center
+    2026-10-23 | Nybro Vikings IF - Södertälje SK | 3 - 1 | (1-0, 1-0, 1-1) | 1635 | Liljas Arena

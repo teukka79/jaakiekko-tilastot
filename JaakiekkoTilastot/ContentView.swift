@@ -157,7 +157,7 @@ struct ContentView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Jääkiekon Pistepörssi")
+                Text("Jääkiekko Tilastot")
                     .font(.system(size: 26, weight: .heavy))
                     .foregroundStyle(Theme.accentGradient)
                 Text("Kausi 2026/2027 · \(visible.count) pelaajaa · \(store.ratedCount) arvosteltu · \(store.notesCount) muistiinpanoa")

@@ -11,7 +11,7 @@ function openDetail(id) {
     if (!p) { t.innerHTML = '<div class="muted">Pelaajaa ei löytynyt</div>'; return; }
     const chips = [positionLabel(p), p.nat, playerAge(p) != null ? `${playerAge(p)} v` : null, p.shoots ? (p.shoots === 'L' ? 'Vasenkätinen' : p.shoots === 'R' ? 'Oikeakätinen' : p.shoots) : null].filter(Boolean).map(chip).join(' ');
     const st = (l, v, hl) => `<div class="card sm stat${hl ? ' hl' : ''}"><b>${v}</b><span>${l}</span></div>`;
-    t.innerHTML = `<div class="row" style="gap:14px">${logoHTML(p.team, 56)}<div><div style="font-size:22px;font-weight:800">${esc(p.name)}</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(p.flag)} <a href="#" data-teamres="${esc(p.team)}" style="color:inherit;text-decoration:underline dotted">${esc(p.team)}</a> · ${esc(leagueLabel(p.league))}</div></div><div class="spacer"></div>${closeBtn()}</div>
+    t.innerHTML = `<div class="row" style="gap:14px">${logoHTML(p.team, 56)}<div><div style="font-size:22px;font-weight:800">${esc(p.name)}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(p.flag)} <a href="#" data-teamres="${esc(p.team)}" style="color:inherit;text-decoration:underline dotted">${esc(p.team)}</a> · ${esc(leagueLabel(p.league))}</div></div><div class="spacer"></div>${closeBtn()}</div>
       <div class="row" style="margin-top:16px">${starsHTML(Store.rating(id), { size: 22, id })}<div class="spacer"></div>${chips}</div>
       <div class="stats" style="margin-top:16px">${st('O', num(p.games))}${st('M', num(p.goals))}${st('S', num(p.assists))}${st('P', num(playerPoints(p)), true)}${st('P/O', ppgString(playerPPG(p)))}${st('L', num(p.shots))}${st('YV', num(p.ppPoints))}${st('RM', num(p.pim))}${st('+/-', signed(p.plusMinus))}</div>`;
     const btns = $('#dbtns', m.body);
@@ -35,7 +35,7 @@ function openDetail(id) {
       h += `<div class="card sm"><table class="tbl"><thead><tr><th class="l">Päivä</th><th class="l">Koti/Vieras</th><th class="l">Vastustaja</th>${sh ? '<th>Laukaus</th>' : ''}<th>Maali</th><th>Syöttö</th><th>Pisteet</th>${pp ? '<th>Ylivoima</th>' : ''}</tr></thead><tbody>` +
         r.games.map(x => { const pts = x.goals + x.assists; return `<tr style="${pts > 0 ? 'background:rgba(34,211,238,.07)' : ''}"><td class="l muted">${shortDate(x.date)}</td><td class="l muted">${x.home === true ? 'Koti' : x.home === false ? 'Vieras' : '–'}</td><td class="l" style="font-weight:500">${esc(x.opponent)}</td>${sh ? `<td class="muted">${num(x.shots)}</td>` : ''}<td>${x.goals}</td><td>${x.assists}</td><td class="${pts > 0 ? 'cyan' : 'muted'}" style="font-weight:700">${pts}</td>${pp ? `<td class="${(x.pp || 0) > 0 ? 'amber' : 'muted'}">${num(x.pp)}</td>` : ''}</tr>`; }).join('') + '</tbody></table></div>';
     }
-    if (r.note) h += `<div class="muted" style="font-size:11px;margin-top:6px">${esc(r.note)}</div>`;
+    if (r.note) h += `<div class="muted" style="font-size:12px;margin-top:6px">${esc(r.note)}</div>`;
     b.innerHTML = h;
   });
 }
@@ -87,8 +87,8 @@ function openCompare() {
       ['Pisteet / ottelu', playerPPG, p => ppgString(playerPPG(p))], ['Rangaistusminuutit', p => p.pim == null ? null : -p.pim, p => num(p.pim)], ['+/-', p => p.plusMinus, p => signed(p.plusMinus)]];
     const cols = `150px repeat(${ps.length},1fr)`;
     m.body.innerHTML = `<div class="mhead"><h2>Pelaajavertailu</h2><div class="spacer"></div><button class="btn" id="cclear">Tyhjennä valinnat</button><button class="btn primary" data-close>Sulje</button></div>
-      <div class="cmpgrid" style="grid-template-columns:${cols};text-align:center;margin-bottom:12px"><div></div>${ps.map(p => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">${logoHTML(p.team, 44)}<div style="font-weight:700;font-size:14px">${esc(p.name)}</div><div class="muted" style="font-size:11px">${esc(p.team)}</div>${starsHTML(Store.rating(p.id), { size: 12, ro: true })}</div>`).join('')}</div>
-      <div class="card">${metrics.map(([t, f, tx]) => { const vals = ps.map(f).filter(x => x != null); const best = vals.length ? Math.max(...vals) : null; return `<div class="cmpgrid" style="grid-template-columns:${cols};padding:10px 14px;border-bottom:1px solid var(--hair)"><div class="muted" style="font-size:12px">${t}</div>${ps.map(p => { const x = f(p); const isBest = x != null && x === best && vals.filter(y => y === best).length < ps.length; return `<div class="mono ${isBest ? 'best' : ''}" style="text-align:center;font-size:15px">${tx(p)}</div>`; }).join('')}</div>`; }).join('')}</div>`;
+      <div class="cmpgrid" style="grid-template-columns:${cols};text-align:center;margin-bottom:12px"><div></div>${ps.map(p => `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">${logoHTML(p.team, 44)}<div style="font-weight:700;font-size:14px">${esc(p.name)}</div><div class="muted" style="font-size:12px">${esc(p.team)}</div>${starsHTML(Store.rating(p.id), { size: 12, ro: true })}</div>`).join('')}</div>
+      <div class="card">${metrics.map(([t, f, tx]) => { const vals = ps.map(f).filter(x => x != null); const best = vals.length ? Math.max(...vals) : null; return `<div class="cmpgrid" style="grid-template-columns:${cols};padding:10px 14px;border-bottom:1px solid var(--hair)"><div class="muted" style="font-size:13px">${t}</div>${ps.map(p => { const x = f(p); const isBest = x != null && x === best && vals.filter(y => y === best).length < ps.length; return `<div class="mono ${isBest ? 'best' : ''}" style="text-align:center;font-size:15px">${tx(p)}</div>`; }).join('')}</div>`; }).join('')}</div>`;
     $('#cclear', m.body).onclick = () => { UI.compare = []; renderToolbar(); renderMain(); m.close(); };
   };
   render();
@@ -105,15 +105,17 @@ function openSettings() {
       <label class="switch"><input type="checkbox" id="s_notify" ${S.notifyEnabled ? 'checked' : ''}>Ilmoita, kun pelaaja tekee maalin tai syöttää</label>
       <div class="row"><span class="muted">Pelaajat, joilla tähtiä vähintään</span>${[1, 2, 3].map(n => `<button class="btn${S.notifyMinStars === n ? ' active' : ''}" data-stars="${n}">${n}</button>`).join('')}</div>
       <label class="switch"><input type="checkbox" id="s_sound" ${S.notifySound ? 'checked' : ''}>Äänimerkki ilmoituksen yhteydessä</label>
-      <div class="row"><span class="muted" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ääni: ${esc(Sound.name || 'järjestelmän oletus')}</span><button class="btn" id="s_pick">Valitse äänitiedosto…</button>${Sound.name ? '<button class="btn" id="s_clr">Palauta oletus</button>' : ''}<button class="btn" id="s_test">Testaa</button></div>
-      ${soundErr ? `<div class="red" style="font-size:11px">${esc(soundErr)}</div>` : ''}
-      <div class="muted" style="font-size:11px">Ilmoitukset tulevat käynnissä olevista peleistä NHL:ssä, AHL:ssä ja Liigassa noin minuutin viiveellä. Jos ilmoitukset eivät näy, salli ne Windowsin Asetukset > Järjestelmä > Ilmoitukset.</div>
+      <div class="row"><span class="muted" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ääni: ${esc(Sound.name || 'notifica_diretta.mp3 (oletus)')}</span><button class="btn" id="s_pick">Valitse äänitiedosto…</button>${Sound.name ? '<button class="btn" id="s_clr">Palauta oletus</button>' : ''}<button class="btn" id="s_test">Testaa</button></div>
+      ${soundErr ? `<div class="red" style="font-size:12px">${esc(soundErr)}</div>` : ''}
+      <div class="muted" style="font-size:12px">Ilmoitukset tulevat käynnissä olevista peleistä NHL:ssä, AHL:ssä ja Liigassa noin minuutin viiveellä. Jos ilmoitukset eivät näy, salli ne Windowsin Asetukset > Järjestelmä > Ilmoitukset.</div>
+      ${label('Fontti')}
+      <div class="row" style="gap:8px;flex-wrap:wrap">${FONTS.map(f => `<button class="btn${(S.font || 'Inter') === f[0] ? ' active' : ''}" data-font="${esc(f[0])}" style="font-family:${f[2]},sans-serif">${esc(f[1])}</button>`).join('')}</div>
       ${label('Sovelluksen kuvake')}
       <div class="row" style="gap:14px">${['A:Tumma', 'B:Vaalea', 'C:Sininen', 'D:Neon'].map(s => { const [k, t] = s.split(':'); return `<button class="icopt${(S.appIcon || 'A') === k ? ' on' : ''}" data-icon="${k}"><img src="../icons/Icon${k}.png" alt="">${t}</button>`; }).join('')}</div>
       ${label('Elite Prospects API -avain (SHL ja HockeyAllsvenskan)')}
       <input class="input" type="password" id="s_key" placeholder="${Store.hasEPKey ? 'Avain tallennettu – liitä uusi korvataksesi' : 'Liitä avain tähän'}">
-      <div class="muted" style="font-size:11px">Avain tallennetaan vain tämän sovelluksen omaan tallennustilaan tälle koneelle. Ilmainen taso sallii 1 000 kutsua kuukaudessa, joten SHL/HA haetaan korkeintaan kahden tunnin välein tai Päivitä-napista.</div>
-      ${Store.hasEPKey ? `<div style="font-size:11px" class="${Store.epOK ? 'green' : 'amber'}">Tila: ${esc(Store.status.ep)}</div>` : ''}
+      <div class="muted" style="font-size:12px">Avain tallennetaan vain tämän sovelluksen omaan tallennustilaan tälle koneelle. Ilmainen taso sallii 1 000 kutsua kuukaudessa, joten SHL/HA haetaan korkeintaan kahden tunnin välein tai Päivitä-napista.</div>
+      ${Store.hasEPKey ? `<div style="font-size:12px" class="${Store.epOK ? 'green' : 'amber'}">Tila: ${esc(Store.status.ep)}</div>` : ''}
       <div class="row">${Store.hasEPKey ? '<button class="btn" id="s_delkey">Poista avain</button>' : ''}<div class="spacer"></div><button class="btn" data-close>Sulje</button><button class="btn primary" id="s_save">Tallenna ja hae</button></div></div>`;
     const b = m.body;
     $('#s_notify', b).onchange = async e => { await Store.setSetting('notifyEnabled', e.target.checked); if (e.target.checked && 'Notification' in window) Notification.requestPermission(); };
@@ -122,6 +124,7 @@ function openSettings() {
     $('#s_pick', b).onclick = async () => { const r = await Sound.setFromFile(); soundErr = r === false ? 'Äänitiedoston avaaminen epäonnistui. Kokeile toista tiedostoa.' : ''; render(); };
     if ($('#s_clr', b)) $('#s_clr', b).onclick = async () => { await Sound.clear(); render(); };
     $('#s_test', b).onclick = () => Sound.play();
+    b.querySelectorAll('[data-font]').forEach(x => x.onclick = async () => { await Store.setSetting('font', x.dataset.font); applyFont(x.dataset.font); render(); });
     b.querySelectorAll('[data-icon]').forEach(x => x.onclick = async () => { await native.setIcon(x.dataset.icon); Store.settings.appIcon = x.dataset.icon; render(); });
     if ($('#s_delkey', b)) $('#s_delkey', b).onclick = async () => { await Store.setEPKey(''); render(); };
     $('#s_save', b).onclick = async () => { const k = $('#s_key', b).value; if (k.trim()) await Store.setEPKey(k); m.close(); if (Store.hasEPKey) Store.refreshLive(true); };
@@ -131,15 +134,15 @@ function openSettings() {
 
 // ====================== Sarjataulukko ======================
 function openStandings() {
-  const m = openModal({ width: 900, pad: 20 });
+  const m = openModal({ width: 1120, pad: 20 });
   let league = 'NHL', byDiv = true, rows = [], loading = true, failed = false, token = 0;
   let view = 'table', side = 'all', nWin = 5, line = 4.5, games = null, gamesFailed = false, gamesLoading = false;
-  const L4 = [['NHL', 'NHL'], ['AHL', 'AHL'], ['SM-liiga', 'Liiga'], ['Mestis', 'Mestis']];
-  const section = (title, rs) => `<div class="card sm sect" style="margin-bottom:14px">${title ? label(title) : ''}<table class="tbl"><thead><tr><th class="l" style="width:34px">#</th><th class="l">Joukkue</th><th>O</th><th>V</th><th>H</th><th>JH</th><th>P</th><th>Maalit</th><th>Ero</th></tr></thead><tbody>` +
+  const L4 = [['NHL', 'NHL'], ['AHL', 'AHL'], ['SM-liiga', 'Liiga'], ['Mestis', 'Mestis'], ['SHL', 'SHL'], ['HockeyAllsvenskan', 'HockeyAllsvenskan']];
+  const section = (title, rs) => `<div class="card sm sect" style="margin-bottom:14px">${title ? label(title) : ''}<table class="tbl fx"><thead><tr><th class="l" style="width:34px">#</th><th class="l">Joukkue</th><th>O</th><th>V</th><th>H</th><th>JH</th><th>P</th><th>Maalit</th><th>Ero</th></tr></thead><tbody>` +
     rs.map((r, i) => { const d = r.gf - r.ga; return `<tr><td class="l muted">${i + 1}</td><td class="l"><span class="row" style="gap:8px">${logoHTML(r.team, 30)}<b style="font-size:13px">${esc(r.team)}</b></span></td><td>${r.gp}</td><td>${r.w}</td><td>${r.l}</td><td>${r.otl}</td><td class="cyan" style="font-weight:700;font-size:13px">${r.pts}</td><td class="muted">${r.gf}–${r.ga}</td><td class="${d > 0 ? 'green' : d < 0 ? 'red' : 'muted'}">${d > 0 ? '+' + d : d}</td></tr>`; }).join('') + '</tbody></table></div>';
-  const dm = d => `${d.getDate()}.${d.getMonth() + 1}.`;
+  const p2 = n => String(n).padStart(2, '0'); const dm = d => `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}`;
   const resTip = x => `${x.home ? 'Koti' : 'Vieras'} · ${x.opp} ${x.gf}–${x.ga}${x.g.extra ? ' ' + x.g.extra : ''} · ${dm(x.g.date)}`;
-  const nextTip = s => s.next ? `Seuraava ottelu:\n${s.next.home} · ${s.next.away}\n${s.next.date.getDate()}.${s.next.date.getMonth() + 1}.${s.next.date.getFullYear()}` : 'Ei tulevia otteluita';
+  const nextTip = s => s.next ? `Seuraava ottelu:\n${s.next.home} · ${s.next.away}\n${dm(s.next.date)}` : 'Ei tulevia otteluita';
   const formBadges = (s, list) => `<span class="fb q" title="${esc(nextTip(s))}">?</span>` + list.map(f => `<span class="fb ${f.win ? 'w' : 'l'}${f.x.g.extra ? ' ot' : ''}" title="${esc(resTip(f.x))}">${f.win ? 'V' : 'H'}</span>`).join('');
   const ouBadges = (s, list) => `<span class="fb q" title="${esc(nextTip(s))}">?</span>` + list.map(f => `<span class="fb ${f.over ? 'w' : 'l'}" title="${esc(resTip(f.x) + ' · maaleja ' + (f.x.gf + f.x.ga))}">${f.over ? '+' : '−'}</span>`).join('');
   const groupsOf = (stats) => {
@@ -157,7 +160,7 @@ function openStandings() {
     const head = isForm ? '<th>OTT</th><th>V</th><th>JA-V</th><th>JA-H</th><th>H</th><th>M</th><th>PIS</th><th class="l">Kunto</th>' : '<th>OTT</th><th>O</th><th>U</th><th>M</th><th>M/O</th><th class="l">Viimeiset 5</th>';
     return groupsOf(stats).map(([title, ss]) => {
       ss = ss.slice().sort(isForm ? (a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf : (a, b) => b.over - a.over || (b.tot / (b.allGp || 1)) - (a.tot / (a.allGp || 1)));
-      return `<div class="card sm sect" style="margin-bottom:14px">${title ? label(title) : ''}<table class="tbl"><thead><tr><th class="l" style="width:34px">#</th><th class="l">Joukkue</th>${head}</tr></thead><tbody>` +
+      return `<div class="card sm sect" style="margin-bottom:14px">${title ? label(title) : ''}<table class="tbl fx"><thead><tr><th class="l" style="width:34px">#</th><th class="l">Joukkue</th>${head}</tr></thead><tbody>` +
         ss.map((s, i) => `<tr><td class="l muted">${i + 1}</td><td class="l"><span class="row" style="gap:8px">${logoHTML(s.team, 26)}<b style="font-size:13px">${esc(s.team)}</b></span></td>` + (isForm
           ? `<td>${s.gp}</td><td>${s.w}</td><td>${s.otw}</td><td>${s.otl}</td><td>${s.l}</td><td class="muted">${s.gf}:${s.ga}</td><td class="cyan" style="font-weight:700">${s.pts}</td><td class="l" style="white-space:nowrap">${formBadges(s, s.formN)}</td>`
           : `<td>${s.allGp}</td><td>${s.over}</td><td>${s.under}</td><td class="muted">${s.allGf}:${s.allGa}</td><td class="cyan" style="font-weight:700">${s.allGp ? (s.tot / s.allGp).toFixed(1) : '–'}</td><td class="l" style="white-space:nowrap">${ouBadges(s, s.form)}</td>`) + '</tr>').join('') + '</tbody></table></div>';
@@ -175,13 +178,13 @@ function openStandings() {
     } else body = section(null, sortStandings(rows));
     const seg = (arr, cur, attr) => `<div class="seg">${arr.map(([v, t]) => `<button class="${String(cur) === String(v) ? 'on' : ''}" data-${attr}="${v}">${t}</button>`).join('')}</div>`;
     const subs = view === 'table' ? '' : `<div class="row" style="margin-bottom:12px;gap:12px;flex-wrap:wrap">${seg([['all', 'Yhteensä'], ['home', 'Kotona'], ['away', 'Vieraissa']], side, 'side')}${view === 'form' ? seg([[5, '5'], [10, '10']], nWin, 'n') : seg([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5].map(v => [v, v]), line, 'line')}</div>`;
-    const note = view === 'table' ? (loading || failed ? '' : `O = ottelut, V = voitot, H = tappiot, JH = jatkoaika-/rankkaritappiot, P = pisteet.${league === 'SM-liiga' ? '<br>Liigan taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p).' : ''}`)
-      : view === 'form' ? `OTT = ottelut, JA-V/JA-H = jatkoaika- tai rankkarivoitot/-tappiot, M = maalit, PIS = pisteet valitulta ajalta. Merkit vanhimmasta uusimpaan; ? = seuraava ottelu (vie hiiri päälle). Oranssi kulma = ratkesi jatkoajalla/rankkareilla.${league === 'Mestis' ? ' Mestiksestä ei saa jatkoaikatietoa.' : ''}`
+    const note = view === 'table' ? (loading || failed ? '' : `O = ottelut, V = voitot, H = tappiot, JH = jatkoaika-/rankkaritappiot, P = pisteet.${league === 'SHL' || league === 'HockeyAllsvenskan' ? '<br>Taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p). Lähde: swehockey.se.' : ''}${league === 'SM-liiga' ? '<br>Liigan taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p).' : ''}`)
+      : view === 'form' ? `OTT = ottelut, JA-V/JA-H = jatkoaika- tai rankkarivoitot/-tappiot, M = maalit, PIS = pisteet valitulta ajalta. Merkit uusimmasta vanhimpaan; ? = seuraava ottelu (vie hiiri päälle). Oranssi kulma = ratkesi jatkoajalla/rankkareilla.${league === 'Mestis' ? ' Mestiksestä ei saa jatkoaikatietoa.' : ''}`
       : `O = yli ${line} maalia (ottelun kaikki maalit), U = alle, M = maalit tehty:päästetty, M/O = maaleja per ottelu. Koko kausi, merkit = viimeiset 5 ottelua.`;
     m.body.innerHTML = `<div class="mhead"><h2>Sarjataulukko</h2><div class="spacer"></div>${closeBtn()}</div>
       <div class="row" style="margin-bottom:14px">${L4.map(([id, t]) => `<button class="btn${league === id ? ' active' : ''}" data-lg="${id}">${t}</button>`).join('')}<div class="spacer"></div>${(league === 'NHL' || league === 'AHL') ? `<button class="btn${byDiv ? ' active' : ''}" data-div="1">Divisioonat</button><button class="btn${!byDiv ? ' active' : ''}" data-div="0">Koko sarja</button>` : ''}</div>
       <div class="row" style="margin-bottom:12px"><button class="btn${view === 'table' ? ' active' : ''}" data-view="table">Sarjataulukko</button><button class="btn${view === 'form' ? ' active' : ''}" data-view="form">Kunto</button><button class="btn${view === 'ou' ? ' active' : ''}" data-view="ou">Yli/Alle</button></div>${subs}
-      <div style="max-height:calc(94vh - 250px);overflow:auto">${body}<div class="muted" style="font-size:11px">${note}</div></div>`;
+      <div style="max-height:calc(94vh - 250px);overflow:auto">${body}<div class="muted" style="font-size:12px">${note}</div></div>`;
     m.body.querySelectorAll('[data-lg]').forEach(b => b.onclick = () => { league = b.dataset.lg; load(); });
     m.body.querySelectorAll('[data-div]').forEach(b => b.onclick = () => { byDiv = b.dataset.div === '1'; render(); });
     m.body.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { view = b.dataset.view; if (view !== 'table') loadGames(); render(); });
@@ -201,7 +204,7 @@ function openStandings() {
     if (view !== 'table') loadGames();
     let r;
     if (league === 'NHL') r = await fetchNHLStandings(Store.teams); else if (league === 'Mestis') r = await fetchMestisStandings(Store.teams);
-    else if (league === 'AHL') r = await fetchAHLStandings(Store.teams, await fetchAHLSeasonId()); else r = await fetchLiigaStandings(Store.teams);
+    else if (league === 'AHL') r = await fetchAHLStandings(Store.teams, await fetchAHLSeasonId()); else if (league === 'SHL' || league === 'HockeyAllsvenskan') r = await fetchSweStandings(league, Store.teams); else r = await fetchLiigaStandings(Store.teams);
     if (t !== token || !m.alive) return; if (r) rows = r; else failed = true; loading = false; render();
   };
   load();
@@ -211,7 +214,7 @@ function openStandings() {
 function openSchedule() {
   const m = openModal({ width: 640, pad: 20 });
   let league = 'NHL', games = [], loading = true, failed = false, token = 0;
-  const L4 = [['NHL', 'NHL'], ['AHL', 'AHL'], ['SM-liiga', 'Liiga'], ['Mestis', 'Mestis']];
+  const L4 = [['NHL', 'NHL'], ['AHL', 'AHL'], ['SM-liiga', 'Liiga'], ['Mestis', 'Mestis'], ['SHL', 'SHL'], ['HockeyAllsvenskan', 'HockeyAllsvenskan']];
   const upcoming = () => {
     const now = Date.now(), to = now + 14 * 86400000;
     return games.filter(g => ((g.final && g.date >= now - 48 * 3600000) || g.date >= now - 3 * 3600000) && g.date <= to).sort((a, b) => a.date - b.date);
@@ -226,16 +229,16 @@ function openSchedule() {
       if (!days.size) body = '<div class="empty" style="height:300px">Ei tulevia otteluita seuraavan 14 päivän aikana.</div>';
       else body = [...days.entries()].sort((a, b) => a[0] - b[0]).map(([k, gs]) => `<div class="card sm sect" style="margin-bottom:14px">${label(fmtDay(new Date(k)))}${gs.map(g => {
         const click = g.gameId != null || g.liiga;
-        return `<div class="gamerow${click ? ' click' : ''}"${click ? ` data-g="${esc(g.id)}"` : ''}><span class="mono" style="width:74px;font-size:12px;font-weight:600;color:${g.live ? 'var(--green)' : 'var(--muted)'}">${g.final ? 'Päättynyt' : g.live ? 'Käynnissä' : fmtTime(g.date)}</span>
+        return `<div class="gamerow${click ? ' click' : ''}"${click ? ` data-g="${esc(g.id)}"` : ''}><span class="mono" style="width:74px;font-size:13px;font-weight:600;color:${g.live ? 'var(--green)' : 'var(--muted)'}">${g.final ? 'Päättynyt' : g.live ? 'Käynnissä' : fmtTime(g.date)}</span>
           <span class="tn" style="text-align:right">${esc(g.away)}</span>${logoHTML(g.away, 30)}<span class="sc ${(g.final || g.live) && g.awayScore != null ? '' : 'muted'}">${(g.final || g.live) && g.awayScore != null && g.homeScore != null ? `${g.awayScore} – ${g.homeScore}` : '–'}</span>${logoHTML(g.home, 30)}<span class="tn">${esc(g.home)}</span></div>`; }).join('')}</div>`).join('');
     }
     m.body.innerHTML = `<div class="mhead"><h2>Otteluohjelma</h2><div class="spacer"></div>${closeBtn()}</div>
-      <div class="row" style="margin-bottom:14px">${L4.map(([id, t]) => `<button class="btn${league === id ? ' active' : ''}" data-lg="${id}">${t}</button>`).join('')}<div class="spacer"></div><span class="muted" style="font-size:11px">Vieras – Koti · ajat omassa aikavyöhykkeessäsi</span></div>
+      <div class="row" style="margin-bottom:14px">${L4.map(([id, t]) => `<button class="btn${league === id ? ' active' : ''}" data-lg="${id}">${t}</button>`).join('')}<div class="spacer"></div><span class="muted" style="font-size:12px">Vieras – Koti · ajat omassa aikavyöhykkeessäsi</span></div>
       <div id="sbody" style="max-height:calc(94vh - 160px);overflow:auto">${body}</div>`;
     m.body.querySelectorAll('[data-lg]').forEach(b => b.onclick = () => { league = b.dataset.lg; load(); });
     m.body.querySelectorAll('[data-g]').forEach(r => r.onclick = () => { const g = games.find(x => x.id === r.dataset.g); if (g) openGame(g); });
   };
-  const fetchGames = () => league === 'NHL' ? fetchNHLSchedule(Store.teams) : league === 'Mestis' ? fetchMestisSchedule(Store.teams) : league === 'AHL' ? fetchAHLSchedule(Store.teams) : fetchLiigaSchedule(Store.teams);
+  const fetchGames = () => league === 'NHL' ? fetchNHLSchedule(Store.teams) : league === 'Mestis' ? fetchMestisSchedule(Store.teams) : league === 'AHL' ? fetchAHLSchedule(Store.teams) : (league === 'SHL' || league === 'HockeyAllsvenskan') ? fetchSweSchedule(league, Store.teams) : fetchLiigaSchedule(Store.teams);
   const load = async (silent = false) => {
     const t = ++token;
     if (!silent) { loading = true; failed = false; games = []; render(); }
@@ -262,8 +265,8 @@ function openGame(g0) {
   const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const status = () => game.final ? 'Päättynyt' : game.live ? 'Käynnissä' : `${fmtDay(new Date(game.date))} klo ${fmtTime(game.date)}`;
   const headTeam = (name, score) => `<div class="row" style="flex:1;justify-content:center;gap:10px">${logoHTML(name, 40)}<b style="font-size:15px">${esc(name)}</b>${score != null ? `<b class="cyan mono" style="font-size:22px">${score}</b>` : ''}</div>`;
-  const group = (title, ps, goalie) => !ps || !ps.length ? '' : `<div class="muted" style="display:flex;gap:6px;font-size:10px;font-weight:600;padding:5px 12px"><span style="width:28px;text-align:right">#</span><span style="flex:1;padding-left:4px">${title}</span>${goalie ? '<span style="width:70px;text-align:right">Torjunnat</span>' : '<span style="width:28px;text-align:right">M</span><span style="width:28px;text-align:right">S</span><span style="width:28px;text-align:right">P</span><span style="width:34px;text-align:right">+/-</span><span style="width:28px;text-align:right">L</span>'}<span style="width:48px;text-align:right">Aika</span></div>` +
-    ps.map((p, i) => `<div class="mono" style="display:flex;gap:6px;font-size:12px;padding:4px 12px;${i % 2 ? 'background:rgba(255,255,255,.025)' : ''}"><span class="muted" style="width:28px;text-align:right">${p.sweaterNumber ?? '–'}</span><span style="flex:1;padding-left:4px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((p.name && p.name.default) || '?')} ${p.position ? `<span class="muted" style="font-size:10px;font-weight:400">${esc(p.position)}</span>` : ''}</span>` +
+  const group = (title, ps, goalie) => !ps || !ps.length ? '' : `<div class="muted" style="display:flex;gap:6px;font-size:11px;font-weight:600;padding:5px 12px"><span style="width:28px;text-align:right">#</span><span style="flex:1;padding-left:4px">${title}</span>${goalie ? '<span style="width:70px;text-align:right">Torjunnat</span>' : '<span style="width:28px;text-align:right">M</span><span style="width:28px;text-align:right">S</span><span style="width:28px;text-align:right">P</span><span style="width:34px;text-align:right">+/-</span><span style="width:28px;text-align:right">L</span>'}<span style="width:48px;text-align:right">Aika</span></div>` +
+    ps.map((p, i) => `<div class="mono" style="display:flex;gap:6px;font-size:13px;padding:4px 12px;${i % 2 ? 'background:rgba(255,255,255,.025)' : ''}"><span class="muted" style="width:28px;text-align:right">${p.sweaterNumber ?? '–'}</span><span style="flex:1;padding-left:4px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((p.name && p.name.default) || '?')} ${p.position ? `<span class="muted" style="font-size:11px;font-weight:400">${esc(p.position)}</span>` : ''}</span>` +
       (goalie ? `<span style="width:70px;text-align:right">${esc(p.saveShotsAgainst || '–')}</span>` : `<span style="width:28px;text-align:right">${num(p.goals)}</span><span style="width:28px;text-align:right">${num(p.assists)}</span><span class="${(p.points || 0) > 0 ? 'cyan' : 'muted'}" style="width:28px;text-align:right">${num(p.points)}</span><span style="width:34px;text-align:right">${signed(p.plusMinus)}</span><span style="width:28px;text-align:right">${num(p.sog)}</span>`) + `<span class="muted" style="width:48px;text-align:right">${esc(p.toi || '–')}</span></div>`).join('');
   const teamCard = (team, s) => `<div class="card sm sect" style="margin-bottom:14px">${label(team)}${group('Hyökkääjät', s.forwards, false)}${group('Puolustajat', s.defense, false)}${group('Maalivahdit', s.goalies, true)}</div>`;
   const render = () => {
@@ -272,15 +275,15 @@ function openGame(g0) {
     if (loading) body = '<div class="empty" style="height:260px"><span class="spinner"></span></div>';
     else if (failed) body = '<div class="empty" style="height:260px">Ottelun tietojen haku epäonnistui.</div>';
     else if (d) {
-      body = `<div class="muted" style="font-size:12px;display:flex;flex-direction:column;gap:4px;margin-bottom:14px">${d.rink ? `<span>${esc(d.rink)}</span>` : ''}${d.spectators != null ? `<span>Katsojia: ${d.spectators}</span>` : ''}${d.awayPP && d.homePP ? `<span>Ylivoimamaalit / ylivoimat: ${esc(game.away)} ${d.awayPP} · ${esc(game.home)} ${d.homePP}</span>` : ''}${d.resultNote ? `<span class="amber" style="font-weight:600">${esc(d.resultNote)}</span>` : ''}</div>
-        <div class="card sm sect" style="margin-bottom:14px">${label('Maalit')}${d.goals.length ? '' : '<div class="muted" style="padding:8px 12px">Ei maaleja.</div>'}${d.goals.map((x, i) => `${i === 0 || d.goals[i - 1].period !== x.period ? `<div class="muted" style="font-size:10px;font-weight:600;padding:8px 12px 2px">${periodTitle(x.period)}</div>` : ''}<div class="gamerow" style="background:none"><span class="muted mono" style="width:44px;font-size:12px">${clock(x.seconds)}</span>${logoHTML(x.home ? game.home : game.away, 24)}<div style="flex:1"><div style="font-weight:600">${esc(x.scorer)}</div>${x.assists.length ? `<div class="muted" style="font-size:11px">${esc(x.assists.join(', '))}</div>` : ''}</div>${x.powerPlay ? '<b class="amber" style="font-size:10px">YV</b>' : ''}${x.homeScore != null && x.awayScore != null ? `<span class="sc" style="text-align:right">${x.awayScore} – ${x.homeScore}</span>` : ''}</div>`).join('')}</div>
-        <div class="muted" style="font-size:11px">Liigan rajapinta ei kerro kokoonpanoja tai kentällisiä.</div>`;
+      body = `<div class="muted" style="font-size:13px;display:flex;flex-direction:column;gap:4px;margin-bottom:14px">${d.rink ? `<span>${esc(d.rink)}</span>` : ''}${d.spectators != null ? `<span>Katsojia: ${d.spectators}</span>` : ''}${d.awayPP && d.homePP ? `<span>Ylivoimamaalit / ylivoimat: ${esc(game.away)} ${d.awayPP} · ${esc(game.home)} ${d.homePP}</span>` : ''}${d.resultNote ? `<span class="amber" style="font-weight:600">${esc(d.resultNote)}</span>` : ''}</div>
+        <div class="card sm sect" style="margin-bottom:14px">${label('Maalit')}${d.goals.length ? '' : '<div class="muted" style="padding:8px 12px">Ei maaleja.</div>'}${d.goals.map((x, i) => `${i === 0 || d.goals[i - 1].period !== x.period ? `<div class="muted" style="font-size:11px;font-weight:600;padding:8px 12px 2px">${periodTitle(x.period)}</div>` : ''}<div class="gamerow" style="background:none"><span class="muted mono" style="width:44px;font-size:13px">${clock(x.seconds)}</span>${logoHTML(x.home ? game.home : game.away, 24)}<div style="flex:1"><div style="font-weight:600">${esc(x.scorer)}</div>${x.assists.length ? `<div class="muted" style="font-size:12px">${esc(x.assists.join(', '))}</div>` : ''}</div>${x.powerPlay ? '<b class="amber" style="font-size:11px">YV</b>' : ''}${x.homeScore != null && x.awayScore != null ? `<span class="sc" style="text-align:right">${x.awayScore} – ${x.homeScore}</span>` : ''}</div>`).join('')}</div>
+        <div class="muted" style="font-size:12px">Liigan rajapinta ei kerro kokoonpanoja tai kentällisiä.</div>`;
     } else if (box && box.playerByGameStats && box.playerByGameStats.awayTeam && box.playerByGameStats.homeTeam && !(isEmptyTeam(box.playerByGameStats.awayTeam) && isEmptyTeam(box.playerByGameStats.homeTeam))) {
       body = teamCard(game.away, box.playerByGameStats.awayTeam) + teamCard(game.home, box.playerByGameStats.homeTeam);
-    } else body = '<div class="empty" style="height:260px;text-align:center;padding:0 30px"><div style="color:var(--text)">Kokoonpanoja ei ole vielä julkaistu.</div><div style="font-size:12px">NHL:n rajapinta antaa pelaajalistan vasta, kun ottelu on alkanut. Kentällisiä (ketjuja) se ei kerro lainkaan.</div></div>';
+    } else body = '<div class="empty" style="height:260px;text-align:center;padding:0 30px"><div style="color:var(--text)">Kokoonpanoja ei ole vielä julkaistu.</div><div style="font-size:13px">NHL:n rajapinta antaa pelaajalistan vasta, kun ottelu on alkanut. Kentällisiä (ketjuja) se ei kerro lainkaan.</div></div>';
     m.body.innerHTML = `<div class="mhead"><h2>Ottelu</h2><div class="spacer"></div>${closeBtn()}</div>
       <div class="row" style="gap:14px">${headTeam(game.away, box && box.awayTeam && box.awayTeam.score != null ? box.awayTeam.score : game.awayScore)}<span class="muted">–</span>${headTeam(game.home, box && box.homeTeam && box.homeTeam.score != null ? box.homeTeam.score : game.homeScore)}</div>
-      <div class="muted" style="font-size:12px;text-align:center;margin:8px 0 14px">${status()}</div><div style="max-height:calc(94vh - 220px);overflow:auto">${body}</div>`;
+      <div class="muted" style="font-size:13px;text-align:center;margin:8px 0 14px">${status()}</div><div style="max-height:calc(94vh - 220px);overflow:auto">${body}</div>`;
   };
   const isEmptyTeam = t => !(t.forwards || []).length && !(t.defense || []).length && !(t.goalies || []).length;
   const load = async silent => {
@@ -303,7 +306,7 @@ function openGame(g0) {
 // ====================== Joukkueen tulokset ======================
 function openTeamResults(teamName) {
   const m = openModal({ width: 560, pad: 22 });
-  const head = `<div class="mhead">${logoHTML(teamName, 44)}<div><h2>${esc(teamName)}</h2><div class="muted" style="font-size:12px">5 viimeisintä ottelua</div></div><div class="spacer"></div>${closeBtn()}</div>`;
+  const head = `<div class="mhead">${logoHTML(teamName, 44)}<div><h2>${esc(teamName)}</h2><div class="muted" style="font-size:13px">5 viimeisintä ottelua</div></div><div class="spacer"></div>${closeBtn()}</div>`;
   m.body.innerHTML = head + '<div class="muted"><span class="spinner"></span> Haetaan…</div>';
   fetchTeamResults(teamName, Store.teams).then(r => {
     if (!m.alive) return;
@@ -313,11 +316,11 @@ function openTeamResults(teamName) {
     let h = head;
     if (r.games.length) {
       h += `<div class="row" style="margin-bottom:12px"><span class="label">Muoto</span>${form}<div class="spacer"></div>${chip(`${w} V – ${r.games.length - w} H`)}${chip(`maalit ${gf}–${ga}`)}</div>
-        <div class="card sm sect">${r.games.map(g => `<div class="gamerow${g.game ? ' click' : ''}"${g.game ? ` data-gi="${r.games.indexOf(g)}"` : ''}><span class="mono muted" style="width:52px;white-space:nowrap;font-size:12px">${g.date.getDate()}.${g.date.getMonth() + 1}.</span><span class="muted" style="width:56px;font-size:12px">${g.home ? 'Koti' : 'Vieras'}</span>${logoHTML(g.opponent, 26)}<span class="tn">${esc(g.opponent)}</span>
-          <span class="mono" style="font-weight:700;width:70px;text-align:center">${g.gf} – ${g.ga}${g.extra ? ` <span class="muted" style="font-size:10px;font-weight:600">${g.extra}</span>` : ''}</span><span class="${g.win ? 'green' : 'red'}" style="width:20px;text-align:center;font-weight:800">${g.win ? 'V' : 'H'}</span></div>`).join('')}</div>`;
+        <div class="card sm sect">${r.games.map(g => `<div class="gamerow${g.game ? ' click' : ''}"${g.game ? ` data-gi="${r.games.indexOf(g)}"` : ''}><span class="mono muted" style="width:52px;white-space:nowrap;font-size:13px">${g.date.getDate()}.${g.date.getMonth() + 1}.</span><span class="muted" style="width:56px;font-size:13px">${g.home ? 'Koti' : 'Vieras'}</span>${logoHTML(g.opponent, 26)}<span class="tn">${esc(g.opponent)}</span>
+          <span class="mono" style="font-weight:700;width:70px;text-align:center">${g.gf} – ${g.ga}${g.extra ? ` <span class="muted" style="font-size:11px;font-weight:600">${g.extra}</span>` : ''}</span><span class="${g.win ? 'green' : 'red'}" style="width:20px;text-align:center;font-weight:800">${g.win ? 'V' : 'H'}</span></div>`).join('')}</div>`;
     } else h += '<div class="muted">Ei pelattuja otteluita tällä kaudella.</div>';
-    if (r.note) h += `<div class="muted" style="font-size:11px;margin-top:8px">${esc(r.note)}</div>`;
-    h += '<div class="muted" style="font-size:11px;margin-top:4px">Tulos näytetään joukkueen näkökulmasta (oma maalimäärä ensin). JA = jatkoaika, RL = rankkarit.</div>';
+    if (r.note) h += `<div class="muted" style="font-size:12px;margin-top:8px">${esc(r.note)}</div>`;
+    h += '<div class="muted" style="font-size:12px;margin-top:4px">Tulos näytetään joukkueen näkökulmasta (oma maalimäärä ensin). JA = jatkoaika, RL = rankkarit.</div>';
     m.body.innerHTML = h;
     m.body.querySelectorAll('[data-gi]').forEach(el => el.onclick = () => openGame(r.games[+el.dataset.gi].game));
   });

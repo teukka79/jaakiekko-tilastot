@@ -1,6 +1,6 @@
 # Jääkiekon Pistepörssi – Windows-versio (Electron)
 
-Asennusohjelma: `Jaakiekon-Pisteporssi-Asennus-1.0.0.exe`
+Asennusohjelma: `Jaakiekko-Tilastot-Asennus-1.0.0.exe`
 
 Rakentaminen itse (Windowsissa, Node.js 20+):
 

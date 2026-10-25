@@ -11,6 +11,10 @@ struct JaakiekkoTilastotApp: App {
                 .preferredColorScheme(.dark)
                 .frame(minWidth: 1150, minHeight: 700)
                 .onAppear { store.appIconChoice.apply() }
+                .task {
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    await store.fetchMissingLogos()
+                }
         }
         .windowStyle(.hiddenTitleBar)
     }

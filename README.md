@@ -1,4 +1,4 @@
-# Jääkiekon Pistepörssi 2026/2027 (macOS, SwiftUI)
+# Jääkiekko Tilastot 2026/2027 (macOS, SwiftUI)
 
 Avaa `JaakiekkoTilastot.xcodeproj` Xcodella (16 tai uudempi) ja paina Run (⌘R).
 

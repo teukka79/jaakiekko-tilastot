@@ -37,7 +37,7 @@ struct SettingsView: View {
                 Toggle("Äänimerkki ilmoituksen yhteydessä", isOn: Binding(get: { store.notifySound }, set: { store.setNotifySound($0) }))
                     .toggleStyle(.switch).foregroundStyle(Theme.text)
                 HStack(spacing: 8) {
-                    Text("Ääni: " + (store.customSoundName ?? "järjestelmän oletus"))
+                    Text("Ääni: " + (store.customSoundName ?? "notifica_diretta.mp3 (oletus)"))
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(1)
                     Spacer()
                     Button("Valitse äänitiedosto…") { pickSound() }.buttonStyle(GhostButtonStyle())

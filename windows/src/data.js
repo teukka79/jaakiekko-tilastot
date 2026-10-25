@@ -38,6 +38,10 @@ async function getJSON(url, timeout = 15000) {
   try { return await r.json(); } catch { return null; }
 }
 async function getText(url, timeout = 25000) {
+  if (url.startsWith('https://stats.swehockey.se') && window.native && native.httpText) {
+    const r = await native.httpText(url, timeout); window.__lastHttp = r && { status: r.status, err: r.err };
+    return r && r.text ? r.text : null;
+  }
   const r = await fetchRaw(url, { timeout });
   if (!r || r.status !== 200) return null;
   try { return await r.text(); } catch { return null; }
@@ -444,6 +448,11 @@ async function fetchTeamResults(teamName, teams) {
     }
     return { games: finish(out), note: null };
   }
+  if (L === 'SHL' || L === 'HockeyAllsvenskan') {
+    const games = await fetchSweGames(L, teams); if (!games) return null;
+    const out = games.filter(g => g.final && (g.home === teamName || g.away === teamName)).map(g => { const home = g.home === teamName; return mk(g.date, home ? g.away : g.home, home, home ? g.homeScore : g.awayScore, home ? g.awayScore : g.homeScore, g.extra); });
+    return { games: finish(out), note: null };
+  }
   if (L === 'Mestis') {
     const games = await fetchMestisSchedule(teams); if (!games) return null;
     const out = games.filter(g => g.final && g.homeScore != null && (g.home === teamName || g.away === teamName)).map(g => { const home = g.home === teamName; return mk(g.date, home ? g.away : g.home, home, home ? g.homeScore : g.awayScore, home ? g.awayScore : g.homeScore, null); });
@@ -493,6 +502,10 @@ async function fetchLeagueGames(league, teams) {
     }
     return out;
   }
+  if (league === 'SHL' || league === 'HockeyAllsvenskan') {
+    const gs = await fetchSweGames(league, teams); if (!gs) return null;
+    return gs.map(g => ({ date: g.date, home: g.home, away: g.away, final: g.final, hs: g.homeScore, as: g.awayScore, extra: g.extra }));
+  }
   const games = await fetchMestisSchedule(teams); if (!games) return null;
   return games.map(g => ({ date: g.date, home: g.home, away: g.away, final: !!g.final && g.homeScore != null, hs: g.final ? g.homeScore : null, as: g.final ? g.awayScore : null, extra: null }));
 }
@@ -515,10 +528,181 @@ function computeTeamForm(games, teamNames, league, side, n, line) {
     }
     for (const x of all) { const t = x.gf + x.ga; s.tot += t; if (t > line) s.over++; else s.under++; }
     s.allGp = all.length; s.allGf = all.reduce((a, x) => a + x.gf, 0); s.allGa = all.reduce((a, x) => a + x.ga, 0);
-    s.form = all.slice(-5).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x }));
-    s.form10 = all.slice(-10).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x }));
-    s.formN = all.slice(-(n || 5)).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x }));
+    s.form = all.slice(-5).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x })).reverse();
+    s.form10 = all.slice(-10).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x })).reverse();
+    s.formN = all.slice(-(n || 5)).map(x => ({ win: x.gf > x.ga, over: x.gf + x.ga > line, x })).reverse();
     out.push(s);
   }
   return out;
+}
+
+// ---------- SHL ja HockeyAllsvenskan (stats.swehockey.se) ----------
+const SWE_BASE = 'https://stats.swehockey.se';
+const SWE_NAMES = { SHL: 'SHL', HockeyAllsvenskan: 'HockeyAllsvenskan' };
+const sweKey = s => norm(s).replace(/ /g, '');
+function sweResolve(name, teams, league) {
+  const seed = teams.filter(t => t.league === league), k = sweKey(name);
+  let t = seed.find(t => sweKey(t.name) === k); if (t) return t.name;
+  t = seed.find(t => { const a = sweKey(t.name); const [s, l] = a.length < k.length ? [a, k] : [k, a]; return s.length >= 6 && l.includes(s); });
+  return t ? t.name : null;
+}
+const sweCache = {};
+// Palauttaa [{id, date, home, away, final, homeScore, awayScore, extra, live:false}] tai null
+const sweIds = {};
+async function sweLeagueId(league) {
+  const c = sweIds[league]; if (c && Date.now() - c.t < 3600000) return c.id;
+  const home = await getText(SWE_BASE + '/'); if (!home) return null;
+  const doc0 = new DOMParser().parseFromString(home, 'text/html');
+  let id = null;
+  for (const a of doc0.querySelectorAll('a[href*="/ScheduleAndResults/"]')) {
+    if (a.textContent.trim() === SWE_NAMES[league]) { const m = a.getAttribute('href').match(/\/(?:Overview|Schedule|Live)\/(\d+)/); if (m) { id = m[1]; break; } }
+  }
+  if (id) sweIds[league] = { t: Date.now(), id };
+  return id;
+}
+async function fetchSweGames(league, teams) {
+  const c = sweCache[league]; if (c && Date.now() - c.t < 300000) return c.v;
+  const id = await sweLeagueId(league); if (!id) return null;
+  const html = await getText(`${SWE_BASE}/ScheduleAndResults/Schedule/${id}`, 40000); if (!html) return null;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const out = []; let day = null;
+  for (const tr of doc.querySelectorAll('tr')) {
+    const tds = Array.from(tr.children).filter(e => e.tagName === 'TD'); if (tds.length < 8) continue;
+    const dm = tds[0].textContent.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/); if (dm) day = dm;
+    if (!day) continue;
+    const tmEl = tr.querySelector('.lnkTooltip'); const tm = tmEl && tmEl.textContent.trim().match(/(\d{1,2}):(\d{2})/); if (!tm) continue;
+    const parts = tds[3].textContent.replace(/\s+/g, ' ').trim().split(/\s-\s/); if (parts.length !== 2) continue;
+    const h = sweResolve(parts[0], teams, league), a = sweResolve(parts[1], teams, league); if (!h || !a) continue;
+    const date = zonedToDate(+day[1], +day[2], +day[3], +tm[1], +tm[2], 'Europe/Stockholm');
+    const rm = tds[4].textContent.match(/(\d+)\s*-\s*(\d+)/);
+    const periods = (tds[5].textContent.match(/\d+-\d+/g) || []).length;
+    const gm = tds[4].innerHTML.match(/\/Game\/Events\/(\d+)/);
+    out.push({ id: 'swe-' + (gm ? gm[1] : out.length), gid: gm ? gm[1] : null, date, home: h, away: a, live: false, final: !!rm, homeScore: rm ? +rm[1] : null, awayScore: rm ? +rm[2] : null, extra: rm ? (periods >= 5 ? 'RL' : periods === 4 ? 'JA' : null) : null });
+  }
+  if (!out.length) return null;
+  sweCache[league] = { t: Date.now(), v: out }; return out;
+}
+async function fetchSweStandings(league, teams) {
+  const games = await fetchSweGames(league, teams); if (!games) return null;
+  const table = Object.fromEntries(teams.filter(t => t.league === league).map(t => [t.name, { team: t.name, gp: 0, w: 0, l: 0, otl: 0, pts: 0, gf: 0, ga: 0, group: '' }]));
+  for (const g of games) {
+    if (!g.final) continue; const hr = table[g.home], ar = table[g.away]; if (!hr || !ar) continue;
+    hr.gp++; ar.gp++; hr.gf += g.homeScore; hr.ga += g.awayScore; ar.gf += g.awayScore; ar.ga += g.homeScore;
+    const ex = !!g.extra;
+    if (g.homeScore > g.awayScore) { hr.w++; hr.pts += ex ? 2 : 3; if (ex) { ar.otl++; ar.pts++; } else ar.l++; }
+    else if (g.awayScore > g.homeScore) { ar.w++; ar.pts += ex ? 2 : 3; if (ex) { hr.otl++; hr.pts++; } else hr.l++; }
+  }
+  return Object.values(table);
+}
+
+async function fetchSweSchedule(league, teams) { return await fetchSweGames(league, teams); }
+
+// SHL-logot (TheSportsDB). Puuttuvat haetaan ajon aikana (Store.fetchMissingLogos).
+const EXTRA_LOGOS = {
+  'Brynäs IF': 'https://r2.thesportsdb.com/images/media/team/badge/n7ngcn1700826181.png',
+  'Djurgårdens IF': 'https://r2.thesportsdb.com/images/media/team/badge/eoxtmh1644937914.png',
+  'Färjestad BK': 'https://r2.thesportsdb.com/images/media/team/badge/svvxxu1421610693.png',
+  'Frölunda HC': 'https://r2.thesportsdb.com/images/media/team/badge/1zbgup1656774483.png',
+  'HV71': 'https://r2.thesportsdb.com/images/media/team/badge/k10ji41663411948.png',
+  'IF Björklöven': 'https://r2.thesportsdb.com/images/media/team/badge/0yuhv71700826189.png',
+  'Linköping HC': 'https://r2.thesportsdb.com/images/media/team/badge/330nt41783580950.png',
+  'Luleå HF': 'https://r2.thesportsdb.com/images/media/team/badge/5l7gw41644937943.png',
+  'Malmö Redhawks': 'https://r2.thesportsdb.com/images/media/team/badge/j8gnby1644937928.png',
+  'Örebro HK': 'https://r2.thesportsdb.com/images/media/team/badge/wqtspp1422389481.png',
+};
+
+// ---------- SHL/HA: kokoonpanot, ottelutapahtumat ja pelaajatilastot ----------
+function sweDay(d) { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d); }
+const sweName = s => { const p = String(s).split(','); return p.length >= 2 ? (p.slice(1).join(',').trim() + ' ' + p[0].trim()) : String(s).trim(); };
+const swePos = r => { r = String(r || '').toUpperCase(); if (r === 'GK' || r === 'G') return ['G', null]; if (r === 'C' || r === 'CE') return ['F', 'C']; if (r === 'LW') return ['F', 'L']; if (r === 'RW') return ['F', 'R']; if (/D$/.test(r)) return ['D', 'D']; return ['F', null]; };
+
+// {joukkue: [{no, name, pos, slot, nat, born}]}
+async function fetchSweRoster(league, teams) {
+  const id = await sweLeagueId(league); if (!id) return null;
+  const html = await getText(`${SWE_BASE}/Teams/Info/TeamRoster/${id}`, 40000); if (!html) return null;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const seed = teams.filter(t => t.league === league), out = {};
+  for (const tb of doc.querySelectorAll('table')) {
+    const rows = Array.from(tb.querySelectorAll('tr')); if (!rows.length) continue;
+    const head = rows[0].textContent.replace(/\s+/g, ' ').trim().replace(/\[Top\]/, '').trim();
+    const team = sweResolve(head.slice(0, Math.ceil(head.length / 2)).trim() === head.slice(Math.floor(head.length / 2)).trim() ? head.slice(0, Math.ceil(head.length / 2)).trim() : head, teams, league) || sweResolve(head, teams, league);
+    if (!team) continue;
+    const list = [];
+    for (const r of rows) {
+      const tds = Array.from(r.children).filter(e => e.tagName === 'TD'); if (tds.length < 8) continue;
+      const no = tds[0].textContent.trim(); if (!/^\d+$/.test(no)) continue;
+      const [pos, slot] = swePos(tds[3].textContent.trim());
+      list.push({ no: +no, name: sweName(tds[1].textContent.replace(/\s+/g, ' ').trim()), pos, slot, nat: tds[7].textContent.trim().split(/\s|\//)[0] || null, born: tds[2].textContent.trim() || null });
+    }
+    if (list.length) out[team] = list;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// Jäsentää yhden ottelun tapahtumasivun pieneen muotoon
+function parseSweEvents(html) {
+  const doc = new DOMParser().parseFromString(String(html).replace(/<(\/?)(td|th|tr|br)\b/gi, ' <$1$2'), 'text/html');
+  const rows = Array.from(doc.querySelectorAll('tr')).map(tr => tr.textContent.replace(/\s+/g, ' ').trim());
+  const goalRows = [], pens = [], gk = [];
+  for (const t of rows) {
+    let m = t.match(/^(\d+):(\d+) (\d+)-(\d+) \(([A-Z]+\d?)\) (\S+) (.*)$/);
+    if (m) { goalRows.push(m); continue; }
+    m = t.match(/^(\d+):(\d+) (\d+) min (\S+) (\d+)\./); if (m) { pens.push({ ab: m[4], n: +m[5], m: +m[3] }); continue; }
+    m = t.match(/^(\S{2,5}) \d+\. .+ \d+,\d+% \(\d+\/\d+\)$/); if (m && !gk.includes(m[1])) gk.push(m[1]);
+  }
+  goalRows.sort((x, y) => (+x[3] + +x[4]) - (+y[3] + +y[4]));
+  const side = {}; let ph = 0, pa = 0; const goals = [];
+  for (const m of goalRows) {
+    const hs = +m[3], as = +m[4]; const s = hs > ph ? 'h' : 'a'; ph = hs; pa = as; side[m[6]] = s;
+    const dtl = m[7]; const pi = dtl.search(/Pos\. Part\./); const main = (pi >= 0 ? dtl.slice(0, pi) : dtl).trim();
+    const sm = main.match(/^(\d+)\.\s+(.+?)\s+\((\d+)\)\s*(.*)$/); if (!sm) continue;
+    const ast = []; for (const x of sm[4].matchAll(/(\d+)\.\s+([^\d]+?)\s*(?=\d+\.\s|$)/g)) ast.push({ n: +x[1], name: x[2].trim() });
+    const nums = re => { const mm = dtl.match(re); return mm && mm[1] ? mm[1].split(',').map(v => parseInt(v, 10)).filter(v => !isNaN(v)) : []; };
+    goals.push({ s, type: m[5], sc: { n: +sm[1], name: sm[2].trim() }, ast, pos: nums(/Pos\. Part\.:\s*([\d\s,]*?)\s*(?:Neg\. Part\.|$)/), neg: nums(/Neg\. Part\.:\s*([\d\s,]*)$/) });
+  }
+  if (gk.length >= 2) { if (!side[gk[0]] && !Object.values(side).includes('h')) side[gk[0]] = 'h'; if (!side[gk[1]] && !Object.values(side).includes('a')) side[gk[1]] = 'a'; }
+  const pl = []; for (const p of pens) { const s = side[p.ab] || (gk[0] === p.ab ? 'h' : gk[1] === p.ab ? 'a' : null); if (s) pl.push({ s, n: p.n, m: p.m }); }
+  return { goals, pens: pl };
+}
+
+// Laskee pelaajatilastot päättyneistä otteluista. cache: {gid: parseSweEvents-tulos}
+function aggregateSwe(league, teams, games, cache, roster) {
+  const numMap = {}, ents = {}, perGame = {}, teamGames = {}, teamList = {};
+  const seed = teams.filter(t => t.league === league);
+  const key = (team, name) => team + '|' + norm(name);
+  const blank = (team, name, extra) => Object.assign({ name, team, number: null, pos: null, slot: null, nat: null, born: null, goals: 0, assists: 0, ppPoints: 0, plusMinus: 0, pim: 0 }, extra);
+  for (const [team, list] of Object.entries(roster || {})) {
+    numMap[team] = {};
+    for (const r of list) { numMap[team][r.no] = r.name; ents[key(team, r.name)] = blank(team, r.name, { number: r.no, pos: r.pos, slot: r.slot, nat: r.nat, born: r.born }); }
+  }
+  const ent = (team, name, no) => { const k = key(team, name); return ents[k] || (ents[k] = blank(team, name, { number: no ?? null })); };
+  const rec = (gid, team, name) => { const k = key(team, name); const pg = perGame[k] || (perGame[k] = {}); return pg[gid] || (pg[gid] = { goals: 0, assists: 0, pp: 0 }); };
+  const fin = games.filter(g => g.final && g.gid && cache[g.gid]).sort((a, b) => a.date - b.date);
+  for (const g of fin) {
+    const ev = cache[g.gid]; const tn = s => s === 'h' ? g.home : g.away, on = s => s === 'h' ? g.away : g.home;
+    for (const t of [g.home, g.away]) { teamGames[t] = (teamGames[t] || 0) + 1; (teamList[t] ||= []).push({ id: g.gid, date: sweDay(g.date), opponent: t === g.home ? g.away : g.home, home: t === g.home }); }
+    for (const gl of ev.goals) {
+      const team = tn(gl.s), opp = on(gl.s), pp = /^PP/.test(gl.type);
+      const sn = sweName(gl.sc.name); const se = ent(team, sn, gl.sc.n); se.goals++; rec(g.gid, team, sn).goals++;
+      if (pp) { se.ppPoints++; rec(g.gid, team, sn).pp++; }
+      for (const a of gl.ast) { const an = sweName(a.name); const ae = ent(team, an, a.n); ae.assists++; rec(g.gid, team, an).assists++; if (pp) { ae.ppPoints++; rec(g.gid, team, an).pp++; } }
+      if (!pp && gl.type !== 'PS') {
+        for (const n of gl.pos) { const nm = (numMap[team] || {})[n]; if (nm) { const e = ents[key(team, nm)]; if (e && e.pos !== 'G') e.plusMinus++; } }
+        for (const n of gl.neg) { const nm = (numMap[opp] || {})[n]; if (nm) { const e = ents[key(opp, nm)]; if (e && e.pos !== 'G') e.plusMinus--; } }
+      }
+    }
+    for (const p of ev.pens) { const team = tn(p.s); const nm = (numMap[team] || {})[p.n]; if (nm) { const e = ents[key(team, nm)]; if (e) e.pim += p.m; } }
+  }
+  const byName = {};
+  for (const e of Object.values(ents)) (byName[norm(e.name)] ||= []).push(e);
+  const teamRecent = {}, recent = {}, hot = [];
+  for (const [t, l] of Object.entries(teamList)) teamRecent[t] = l.slice().sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : 0).slice(0, 5);
+  for (const [k, pg] of Object.entries(perGame)) {
+    const team = k.slice(0, k.indexOf('|')); const tr = teamRecent[team] || [];
+    const mine = tr.filter(g => pg[g.id]).map(g => ({ id: g.id, date: g.date, opponent: g.opponent, home: g.home, goals: pg[g.id].goals, assists: pg[g.id].assists, pp: pg[g.id].pp }));
+    if (mine.length) recent[k] = mine;
+    const last4 = (teamList[team] || []).slice().sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : 0).slice(0, 4);
+    if (last4.length === 4 && last4.every(g => pg[g.id] && pg[g.id].goals + pg[g.id].assists > 0)) hot.push(k);
+  }
+  return { byName, teamGames, teamRecent, recent, hot };
 }

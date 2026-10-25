@@ -1,8 +1,8 @@
 {
   "name": "jaakiekko-pisteporssi",
-  "productName": "Jääkiekon Pistepörssi",
-  "version": "1.0.0",
-  "description": "Jääkiekon Pistepörssi 2026/2027",
+  "productName": "Jääkiekko Tilastot",
+  "version": "1.0.1",
+  "description": "Jääkiekko Tilastot 2026/2027",
   "main": "main.js",
   "author": "Teukka",
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "build": {
     "appId": "fi.teukka.JaakiekkoTilastot",
-    "productName": "Jääkiekon Pistepörssi",
+    "productName": "Jääkiekko Tilastot",
     "directories": {
       "output": "dist"
     },
@@ -34,14 +34,14 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Jääkiekon Pistepörssi",
+      "shortcutName": "Jääkiekko Tilastot",
       "language": "1035",
       "installerIcon": "icons/icon.ico",
       "uninstallerIcon": "icons/icon.ico",
       "installerHeaderIcon": "icons/icon.ico"
     },
     "afterPack": "afterPack.js",
-    "artifactName": "Jaakiekon-Pisteporssi-Asennus-${version}.${ext}"
+    "artifactName": "Jaakiekko-Tilastot-Asennus-${version}.${ext}"
   },
   "devDependencies": {
     "country-flag-emoji-polyfill": "^0.1.10",

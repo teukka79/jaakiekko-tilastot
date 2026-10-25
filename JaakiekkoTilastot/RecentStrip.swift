@@ -37,7 +37,7 @@ enum StripMode {
     var thresholds: [Int] { self == .shots ? [1, 3, 5] : [1, 2, 3] }
 }
 
-/// Pelaajan viimeiset (enintään 5) pelit pieninä ruutuina, vanhin vasemmalla.
+/// Pelaajan viimeiset (enintään 5) pelit pieninä ruutuina, uusin vasemmalla.
 struct RecentStrip: View {
     @Environment(AppStore.self) private var store
     let player: Player
@@ -57,7 +57,7 @@ struct RecentStrip: View {
             if !loaded {
                 Text("…").font(.system(size: 11)).foregroundStyle(Theme.muted)
             } else if let g = games, !g.isEmpty {
-                ForEach(Array(g.prefix(5).reversed().enumerated()), id: \.offset) { _, game in
+                ForEach(Array(g.prefix(5).enumerated()), id: \.offset) { _, game in
                     box(game)
                 }
             } else {
@@ -71,6 +71,12 @@ struct RecentStrip: View {
         }
     }
 
+    /// YYYY-MM-DD -> pp.kk.vvvv
+    private static func display(_ iso: String) -> String {
+        let p = iso.split(separator: "-")
+        return p.count == 3 ? "\(p[2]).\(p[1]).\(p[0])" : iso
+    }
+
     private func box(_ g: RecentGame) -> some View {
         let v = mode.value(g)
         let t = mode.thresholds
@@ -81,7 +87,7 @@ struct RecentStrip: View {
             if v >= t[0] { return (Theme.cyan.opacity(0.18), Color(red: 0.40, green: 0.91, blue: 0.98)) }
             return (Color.white.opacity(0.06), Theme.muted)
         }()
-        var tip = "\(g.date) \(g.home == true ? "vs" : g.home == false ? "@" : "–") \(g.opponent) · M \(g.goals), S \(g.assists)"
+        var tip = "\(Self.display(g.date)) \(g.home == true ? "vs" : g.home == false ? "@" : "–") \(g.opponent) · M \(g.goals), S \(g.assists)"
         if let pp = g.pp { tip += ", YV \(pp)" }
         if let s = g.shots { tip += ", L \(s)" }
         return Text(v.map(String.init) ?? "–")

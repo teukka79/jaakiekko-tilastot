@@ -12,11 +12,17 @@ enum LogoLoader {
     static func load(_ url: URL) async -> NSImage? {
         if let img = cache[url] { return img }
         if failed.contains(url) { return nil }
+        // Pysyvä levyvälimuisti: ladattu logo tallennetaan, eikä sitä haeta uudelleen
+        if let data = LogoDisk.read(url), let img = NSImage(data: data) {
+            cache[url] = img
+            return img
+        }
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             guard (response as? HTTPURLResponse)?.statusCode == 200, let img = NSImage(data: data) else {
                 failed.insert(url); return nil
             }
+            LogoDisk.write(data, for: url)
             cache[url] = img
             return img
         } catch {

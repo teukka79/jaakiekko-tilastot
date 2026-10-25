@@ -104,8 +104,9 @@ func fetchLeagueGames(league: League, teams: [Team]) async -> [LeagueGame]? {
             return LeagueGame(date: g.date, home: g.home, away: g.away, final: false, hs: 0, aw: 0)
         }
 
-    default:
-        return nil
+    case .shl, .allsvenskan:
+        guard let games = await fetchSweGames(league: league, teams: teams) else { return nil }
+        return games.map { LeagueGame(date: $0.date, home: $0.home, away: $0.away, final: $0.final, hs: $0.hs, aw: $0.aw, extra: $0.extra) }
     }
 }
 
@@ -178,14 +179,14 @@ func computeTeamForm(games: [LeagueGame], teamNames: [String], league: League, s
 private let formDateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.locale = Locale(identifier: "fi_FI")
-    f.dateFormat = "d.M."
+    f.dateFormat = "dd.MM.yyyy"
     return f
 }()
 
 private let formFullDateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.locale = Locale(identifier: "fi_FI")
-    f.dateFormat = "d.M.yyyy"
+    f.dateFormat = "dd.MM.yyyy"
     return f
 }()
 
@@ -336,7 +337,7 @@ struct TeamFormTables: View {
                 cell("\(s.pts)", 34, bold: true, color: Theme.cyan)
                 HStack(spacing: 3) {
                     FormBadge(text: "?", kind: .unknown, tip: nextTip(s))
-                    ForEach(s.recent) { x in
+                    ForEach(Array(s.recent.reversed())) { x in
                         FormBadge(text: x.win ? "V" : "H", kind: x.win ? .win : .loss, overtime: x.game.extra != nil, tip: resTip(x))
                     }
                 }
@@ -347,7 +348,7 @@ struct TeamFormTables: View {
                 cell(s.allGp > 0 ? String(format: "%.1f", s.avgGoals) : "–", 38, bold: true, color: Theme.cyan)
                 HStack(spacing: 3) {
                     FormBadge(text: "?", kind: .unknown, tip: nextTip(s))
-                    ForEach(s.last5) { x in
+                    ForEach(Array(s.last5.reversed())) { x in
                         let over = Double(x.total) > line
                         FormBadge(text: over ? "+" : "−", kind: over ? .win : .loss, tip: resTip(x) + " · maaleja \(x.total)")
                     }

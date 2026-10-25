@@ -213,6 +213,10 @@ struct AppState: Codable {
     var autoLogos: [String: String]?
     /// Elite Prospects -rajapinnasta haetut tilastot sarjoittain (SHL, HockeyAllsvenskan).
     var liveEP: [String: LiveSnapshot]?
+    /// SHL/HockeyAllsvenskan: Swehockeystä lasketut pelaajatilastot sarjoittain.
+    var liveSwe: [String: SweSnapshot]?
+    /// Haetut ottelutapahtumat (sarja -> ottelun tunnus -> tapahtumat), jotta päättyneitä pelejä ei haeta uudelleen.
+    var sweEvents: [String: [String: SweEvents]]?
 }
 
 /// JSON-varmuuskopio. Kentät ovat samat kuin web-version viennissä, joten tiedostot kelpaavat molempiin suuntiin.

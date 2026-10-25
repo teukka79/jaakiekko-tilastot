@@ -12,15 +12,19 @@ function badgeHTML(name) {
   return `<span class="badge" style="background:hsl(${h},38%,30.5%);border-radius:22%;font-size:calc(var(--sz) * .3)">${esc(Store.abbr(name))}</span>`;
 }
 function logoHTML(team, size = 28) {
-  const url = Store.logoURL(team);
-  const scale = url && url.includes('nhle.com') ? 1 : 0.76;
+  const raw = Store.logoRaw(team), url = raw ? Store.resolveLogo(raw) : null;
+  const scale = raw && raw.includes('nhle.com') ? 1 : 0.76;
   const inner = Math.round(size * scale);
-  const body = url ? `<img src="${esc(url)}" data-team="${esc(team)}" loading="lazy" alt="">` : badgeHTML(team);
+  const body = url ? `<img src="${esc(url)}" data-team="${esc(team)}"${url !== raw ? ` data-orig="${esc(raw)}"` : ''} loading="lazy" alt="">` : badgeHTML(team);
   return `<span class="logo" style="width:${size}px;height:${size}px;--sz:${inner}px"><span style="display:flex;width:${inner}px;height:${inner}px">${body}</span></span>`;
 }
 document.addEventListener('error', e => {
   const img = e.target;
-  if (img && img.tagName === 'IMG' && img.dataset.team) { img.parentElement.innerHTML = badgeHTML(img.dataset.team); }
+  if (img && img.tagName === 'IMG' && img.dataset.team) {
+    const orig = img.dataset.orig;
+    if (orig) { delete img.dataset.orig; delete Store.logoMap[orig]; try { native.forgetLogo(orig); } catch {} img.src = orig; return; }
+    img.parentElement.innerHTML = badgeHTML(img.dataset.team);
+  }
 }, true);
 
 function starsHTML(value, { size = 15, id = '', ro = false } = {}) {
@@ -38,26 +42,48 @@ function openModal({ width = 560, html = '', pad = 22, onClose } = {}) {
   const ov = document.createElement('div'); ov.className = 'overlay';
   ov.innerHTML = `<div class="modal" style="width:${width}px;padding:${pad}px">${html}</div>`;
   $('#modals').appendChild(ov);
-  const m = { el: ov, body: ov.firstElementChild, alive: true, refresh: null, close() { if (!m.alive) return; m.alive = false; ov.remove(); const i = modals.indexOf(m); if (i >= 0) modals.splice(i, 1); onClose && onClose(); } };
+  const prevFocus = document.activeElement;
+  const m = { el: ov, body: ov.firstElementChild, alive: true, refresh: null, close() { if (!m.alive) return; m.alive = false; ov.remove(); const i = modals.indexOf(m); if (i >= 0) modals.splice(i, 1); onClose && onClose(); if (prevFocus && prevFocus.isConnected && prevFocus.focus) { try { prevFocus.focus({ preventScroll: true }); } catch {} } } };
+  m.body.setAttribute('role', 'dialog'); m.body.setAttribute('aria-modal', 'true'); m.body.tabIndex = -1;
+  setTimeout(() => { if (m.alive && !m.body.contains(document.activeElement)) { const f = m.body.querySelector('button:not([data-close]),input,select,textarea,[tabindex="0"]') || m.body; try { f.focus({ preventScroll: true }); } catch {} } }, 30);
   ov.addEventListener('mousedown', e => { if (e.target === ov) m.close(); });
   ov.addEventListener('click', e => { if (e.target.closest('[data-close]')) m.close(); });
   modals.push(m); return m;
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && modals.length) modals[modals.length - 1].close(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modals.length) { modals[modals.length - 1].close(); return; }
+  if (e.key === 'Tab' && modals.length) {   // Tab pysyy ikkunan sisällä
+    const m = modals[modals.length - 1];
+    const f = Array.from(m.body.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')).filter(x => !x.disabled && x.offsetParent !== null);
+    if (!f.length) { e.preventDefault(); return; }
+    const first = f[0], last = f[f.length - 1], a = document.activeElement;
+    if (!m.body.contains(a)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && (a === first || a === m.body)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+  }
+});
 const closeBtn = () => '<button class="x-btn" data-close title="Sulje">✕</button>';
 
 // ====================== Pääasetelma ======================
-const UI = { league: 'NHL', team: null, search: '', sortKey: 'points', asc: false, onlyFavs: false, mode: 'table', compare: [] };
+const UI = { league: 'NHL', team: null, pos: '', search: '', sortKey: 'points', asc: false, onlyFavs: false, mode: 'table', compare: [] };
 const COLS = [
-  { key: 'name', title: 'Pelaaja', w: null }, { key: 'number', title: 'Nro', w: 40 }, { key: 'nat', title: 'Kansalaisuus', w: 100 }, { key: 'slot', title: 'Pelipaikka', w: 120 },
+  { key: 'name', title: 'Pelaaja', w: null }, { key: 'number', title: 'Nro', w: 40 }, { key: 'nat', title: 'Kansalaisuus', w: 80 }, { key: 'slot', title: 'Pelipaikka', w: 128 },
   { key: 'games', title: 'Ottelut', w: 58 }, { key: 'goals', title: 'Maalit', w: 54 }, { key: 'assists', title: 'Syötöt', w: 54 }, { key: 'points', title: 'Pisteet', w: 56 },
-  { key: 'ppg', title: 'Pist./ott.', w: 70 }, { key: 'shots', title: 'Laukaukset', w: 78 }, { key: 'pp', title: 'Ylivoima', w: 62 }, { key: 'plusMinus', title: '+/-', w: 46 }, { key: 'recent', title: 'Viim. 5', w: 156, nosort: true }, { key: 'rating', title: 'Tähdet', w: 84 },
+  { key: 'ppg', title: 'Pist./ott.', w: 70 }, { key: 'shots', title: 'Laukaukset', w: 72 }, { key: 'pp', title: 'Ylivoima', w: 58 }, { key: 'plusMinus', title: '+/-', w: 46 }, { key: 'recent', title: 'Viim. 5', w: 144, nosort: true }, { key: 'rating', title: 'Tähdet', w: 98 },
 ];
 
+const POS_OPTS = [['', 'Kaikki pelipaikat'], ['F', 'Hyökkääjät'], ['C', 'Keskushyökkääjät'], ['L', 'Vasemmat laidat'], ['R', 'Oikeat laidat'], ['D', 'Puolustajat'], ['G', 'Maalivahdit']];
+function posMatch(p) {
+  const f = UI.pos; if (!f) return true;
+  if (f === 'F') return p.pos === 'F' || ['C', 'L', 'R'].includes(p.slot);
+  if (f === 'D') return p.pos === 'D' || p.slot === 'D';
+  if (f === 'G') return p.pos === 'G';
+  return p.slot === f;
+}
 function visiblePlayers() {
   const q = norm(UI.search);
   const list = Store.players.filter(p =>
-    (!UI.league || p.league === UI.league) && (!UI.team || p.team === UI.team) && (!UI.onlyFavs || Store.rating(p.id) === 3) &&
+    (!UI.league || p.league === UI.league) && (!UI.team || p.team === UI.team) && posMatch(p) && (!UI.onlyFavs || Store.rating(p.id) === 3) &&
     (!q || norm(p.name + ' ' + p.team + ' ' + (p.nat || '')).includes(q)));
   const dir = UI.asc ? 1 : -1;
   const byName = (x, y) => x.name.localeCompare(y.name, 'fi');
@@ -74,7 +100,7 @@ function visiblePlayers() {
 function buildShell() {
   $('#app').innerHTML = `
     <div class="header">
-      <div><div class="title">Jääkiekon Pistepörssi</div><div class="subtitle" id="subtitle"></div></div>
+      <div><div class="title">Jääkiekko Tilastot</div><div class="subtitle" id="subtitle"></div></div>
       <div class="spacer"></div>
       <div class="row" style="gap:10px"><span id="spin"></span><div class="status" id="status"></div><button class="btn" id="refresh">⟳ Päivitä</button></div>
     </div>
@@ -99,14 +125,14 @@ function renderToolbar() {
     <div class="row">${lbtn(null, 'Kaikki')}${LEAGUES.map(l => lbtn(l.id, l.label, l.flags)).join('')}<div class="spacer"></div>
       <div class="seg"><button data-mode="table" class="${UI.mode === 'table' ? 'on' : ''}">▤ Taulukko</button><button data-mode="teams" class="${UI.mode === 'teams' ? 'on' : ''}">▦ Joukkueet</button></div></div>
     <div class="row">
-      <div class="search"><span class="ic">⌕</span><input class="input" id="search" placeholder="Hae pelaajaa, joukkuetta tai kansallisuutta" value="${esc(UI.search)}"><button class="x ${UI.search ? '' : 'hidden'}" id="clearsearch">✕</button></div>
+      <div class="search"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></span><input class="input" id="search" placeholder="Hae pelaajaa, joukkuetta tai kansallisuutta" value="${esc(UI.search)}"><button class="x ${UI.search ? '' : 'hidden'}" id="clearsearch">✕</button></div>
+      <select class="select" id="possel" style="width:190px" aria-label="Pelipaikka">${POS_OPTS.map(([v, t]) => `<option value="${v}"${UI.pos === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
       <select class="select" id="teamsel" style="width:210px"><option value="">Kaikki joukkueet</option>${teamNames.map(n => `<option value="${esc(n)}"${UI.team === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      ${UI.team ? '<button class="btn" id="teamres">📊 Joukkueen tulokset</button>' : ''}<button class="btn${UI.onlyFavs ? ' active' : ''}" id="favs">${UI.onlyFavs ? '★' : '☆'} Suosikit</button>
+      ${UI.team ? '<button class="btn" id="teamres">📊 Joukkueen tulokset</button>' : ''}<button class="btn${UI.onlyFavs ? ' active' : ''}" id="favs"><span class="bigstar">${UI.onlyFavs ? '★' : '☆'}</span> Suosikit</button>
       <div class="spacer"></div>
       <button class="btn${UI.compare.length >= 2 ? ' active' : ''}" id="cmpbtn"${UI.compare.length < 2 ? ' disabled' : ''}>⇄ Vertaa (${UI.compare.length})</button>
       <button class="btn" id="standbtn">☰ Sarjataulukko</button>
       <button class="btn" id="schedbtn">📅 Otteluohjelma</button>
-      <button class="btn primary" id="addbtn">＋ Lisää pelaaja</button>
       <div style="position:relative"><button class="btn" id="menubtn">⋯</button><div class="menu hidden" id="menu">
         <button data-m="export">Vie JSON…</button><button data-m="import">Tuo JSON…</button><button data-m="stand">Sarjataulukko</button><button data-m="sched">Otteluohjelma</button><button data-m="settings">Asetukset…</button><hr><button data-m="reset">Nollaa näkyvien tähdet</button></div></div>
     </div>`;
@@ -115,11 +141,12 @@ function renderToolbar() {
   tb.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { UI.mode = b.dataset.mode; renderToolbar(); renderMain(); });
   let st; $('#search').oninput = e => { UI.search = e.target.value; $('#clearsearch').classList.toggle('hidden', !UI.search); clearTimeout(st); st = setTimeout(() => { renderHeader(); renderMain(); }, 120); };
   $('#clearsearch').onclick = () => { UI.search = ''; renderToolbar(); renderHeader(); renderMain(); };
+  $('#possel').onchange = e => { UI.pos = e.target.value; renderToolbar(); renderHeader(); renderMain(); };
   $('#teamsel').onchange = e => { UI.team = e.target.value || null; renderToolbar(); renderHeader(); renderMain(); };
   if ($('#teamres')) $('#teamres').onclick = () => openTeamResults(UI.team);
   $('#favs').onclick = () => { UI.onlyFavs = !UI.onlyFavs; renderToolbar(); renderHeader(); renderMain(); };
   $('#cmpbtn').onclick = () => openCompare();
-  $('#standbtn').onclick = () => openStandings(); $('#schedbtn').onclick = () => openSchedule(); $('#addbtn').onclick = () => openForm(null);
+  $('#standbtn').onclick = () => openStandings(); $('#schedbtn').onclick = () => openSchedule();
   const menu = $('#menu'); $('#menubtn').onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); };
   menu.onclick = async e => {
     const b = e.target.closest('[data-m]'); if (!b) return; menu.classList.add('hidden');
@@ -147,28 +174,31 @@ function renderMain() {
       else if (a.dataset.act === 'star') Store.setRating(id, +a.dataset.n);
     };
   }
-  $('#thead').innerHTML = `<div style="width:22px"></div>` + COLS.map(c => c.nosort
+  $('#thead').innerHTML = `<div style="width:28px"></div><div style="width:22px"></div>` + COLS.map(c => c.nosort
     ? `<div class="h" title="Viimeisten pelien jakauma. Näytettävä luku seuraa lajittelua: maalit, syötöt, ylivoima tai laukaukset; muuten pisteet." style="width:${c.w}px;flex:none;cursor:default">${recentTitle()}</div>`
-    : `<div class="h${UI.sortKey === c.key ? ' on' : ''}" data-sort="${c.key}" style="${c.w ? `width:${c.w}px;flex:none` : 'flex:1;text-align:left'}">${c.title}${UI.sortKey === c.key ? (UI.asc ? ' ▲' : ' ▼') : ''}</div>`).join('');
+    : `<div class="h${UI.sortKey === c.key ? ' on' : ''}" data-sort="${c.key}" style="${c.w ? `width:${c.w}px;flex:none` : 'flex:1;text-align:left'}">${c.title}${UI.sortKey === c.key ? `<span class="sa">${UI.asc ? '▲' : '▼'}</span>` : ''}</div>`).join('');
+  { const fixed = COLS.reduce((a, c) => a + (c.w || 0), 0); const need = 28 + 22 + 250 + fixed + 6 * (COLS.length + 3) + 28; $('#thead').style.minWidth = $('#tbody').style.minWidth = need + 'px'; }
   const list = visiblePlayers(); const body = $('#tbody'); const top = body.scrollTop;
   if (!list.length) { body.innerHTML = '<div class="empty" style="height:100%"><div style="font-size:28px">⌕</div>Ei hakua vastaavia pelaajia</div>'; return; }
-  body.innerHTML = list.map(rowHTML).join(''); body.scrollTop = top; loadRecentForVisible(list);
+  body.innerHTML = list.map((p, i) => rowHTML(p, i)).join(''); body.scrollTop = top; loadRecentForVisible(list);
 }
 
-function rowHTML(p) {
+function rowHTML(p, i = 0) {
   const sel = UI.compare.includes(p.id); const pts = playerPoints(p); const pm = p.plusMinus;
+  const medal = i < 3 && !UI.asc ? ' m' + (i + 1) : '';
   return `<div class="trow${sel ? ' sel' : ''}">
+    <div class="rk${medal}">${i + 1}</div>
     <div class="chk${sel ? ' on' : ''}" data-act="cmp" data-id="${esc(p.id)}" title="Valitse vertailuun">${sel ? '☑' : '☐'}</div>
-    <div class="cname" data-act="open" data-id="${esc(p.id)}">${logoHTML(p.team, 44)}<div style="min-width:0"><div class="n">${esc(p.name)}${Store.isHot(p) ? '<span title="Vähintään yksi piste jokaisessa neljässä viimeisessä pelissä">🔥</span>' : ''}${Store.note(p.id) ? '<span class="cyan" style="font-size:11px">✎</span>' : ''}</div><div class="t">${esc(p.flag)} ${esc(p.team)}</div></div></div>
+    <div class="cname" data-act="open" data-id="${esc(p.id)}">${logoHTML(p.team, 48)}<div style="min-width:0"><div class="n">${esc(p.name)}${Store.isHot(p) ? '<span title="Vähintään yksi piste jokaisessa neljässä viimeisessä pelissä">🔥</span>' : ''}${Store.note(p.id) ? '<span class="cyan" style="font-size:12px">✎</span>' : ''}</div><div class="t">${esc(p.flag)} ${esc(p.team)}</div></div></div>
     <div class="c muted" style="width:40px">${p.number != null ? '#' + p.number : '–'}</div>
-    <div class="c muted" style="width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(natLabel(p.nat))}</div>
-    <div class="c muted" style="width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(slotLabel(p))}</div>
+    <div class="c muted" style="width:80px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(natLabel(p.nat))}</div>
+    <div class="c muted" style="width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(slotLabel(p))}</div>
     <div class="c" style="width:58px">${num(p.games)}</div><div class="c" style="width:54px">${num(p.goals)}</div><div class="c" style="width:54px">${num(p.assists)}</div>
     <div class="c cyan" style="width:56px;font-weight:700">${num(pts)}</div><div class="c" style="width:70px">${ppgString(playerPPG(p))}</div>
-    <div class="c" style="width:78px">${num(p.shots)}</div><div class="c" style="width:62px">${num(p.ppPoints)}</div>
+    <div class="c" style="width:72px">${num(p.shots)}</div><div class="c" style="width:58px">${num(p.ppPoints)}</div>
     <div class="c ${pm > 0 ? 'green' : pm < 0 ? 'red' : ''}" style="width:46px">${signed(pm)}</div>
-    <div class="c" style="width:156px;justify-content:center" data-rg="${esc(p.id)}">${recentCellHTML(p)}</div>
-    <div class="c" style="width:84px">${starsHTML(Store.rating(p.id), { id: p.id })}</div></div>`;
+    <div class="c" style="width:144px;justify-content:center" data-rg="${esc(p.id)}">${recentCellHTML(p)}</div>
+    <div class="c" style="width:98px">${starsHTML(Store.rating(p.id), { id: p.id, size: 20 })}</div></div>`;
 }
 
 function renderTeams() {
@@ -177,8 +207,8 @@ function renderTeams() {
     const roster = Store.players.filter(p => p.team === name);
     let top = null; for (const p of roster) if (playerPoints(p) != null && (!top || playerPoints(p) > playerPoints(top))) top = p;
     const t = Store.teamByName[name];
-    return `<div class="card team" data-team="${esc(name)}"><div class="row" style="gap:12px">${logoHTML(name, 52)}<div style="min-width:0"><div style="font-size:14px;font-weight:700">${esc(name)}</div><div class="muted" style="font-size:11px">${esc(t ? leagueLabel(t.league) : 'Oma joukkue')}</div></div></div><hr>
-      <div class="row" style="font-size:11px"><span class="muted">${roster.length} pelaajaa</span><button class="btn" data-res="${esc(name)}" style="padding:3px 8px;font-size:11px">Tulokset</button><div class="spacer"></div>${top ? `<span class="cyan" style="font-weight:600">${esc(top.name.split(' ').pop())} ${playerPoints(top)} p</span>` : ''}</div></div>`;
+    return `<div class="card team" data-team="${esc(name)}"><div class="row" style="gap:12px">${logoHTML(name, 52)}<div style="min-width:0"><div style="font-size:14px;font-weight:700">${esc(name)}</div><div class="muted" style="font-size:12px">${esc(t ? leagueLabel(t.league) : 'Oma joukkue')}</div></div></div><hr>
+      <div class="row" style="font-size:12px"><span class="muted">${roster.length} pelaajaa</span><button class="btn" data-res="${esc(name)}" style="padding:3px 8px;font-size:12px">Tulokset</button><div class="spacer"></div>${top ? `<span class="cyan" style="font-weight:600">${esc(top.name.split(' ').pop())} ${playerPoints(top)} p</span>` : ''}</div></div>`;
   }).join('');
   grid.onclick = e => { const rb = e.target.closest('[data-res]'); if (rb) { openTeamResults(rb.dataset.res); return; } const c = e.target.closest('[data-team]'); if (!c) return; const n = c.dataset.team; UI.team = n; const t = Store.teamByName[n]; if (t) UI.league = t.league; UI.mode = 'table'; renderToolbar(); renderHeader(); renderMain(); };
 }
@@ -213,21 +243,72 @@ function recentValue(g, mode) {
 }
 function recentCellHTML(p) {
   const c = Store.recentCache[p.id]; const mode = recentMode()[0];
-  if (!c) return '<span class="muted" style="font-size:11px">…</span>';
+  if (!c) return '<span class="muted" style="font-size:12px">…</span>';
   if (!c.v.games.length) return '<span class="muted">–</span>';
-  const games = c.v.games.slice(0, 5).slice().reverse();
+  const games = c.v.games.slice(0, 5);
   return games.map(g => {
     const v = recentValue(g, mode); const hi = mode === 'shots' ? [1, 3, 5] : [1, 2, 3];
     const cls = v == null ? 'rg0' : v >= hi[2] ? 'rg3' : v >= hi[1] ? 'rg2' : v >= hi[0] ? 'rg1' : 'rg0';
-    const d = (g.date || '').split('-'); const ds = d.length === 3 ? `${+d[2]}.${+d[1]}.` : '';
+    const d = (g.date || '').split('-'); const ds = d.length === 3 ? `${d[2]}.${d[1]}.${d[0]}` : '';
     const tip = `${ds} ${g.home === true ? 'vs' : g.home === false ? '@' : '–'} ${g.opponent} · M ${g.goals || 0}, S ${g.assists || 0}${g.pp != null ? ', YV ' + g.pp : ''}${g.shots != null ? ', L ' + g.shots : ''}`;
     return `<span class="rg ${cls}" title="${esc(tip)}">${v == null ? '–' : v}</span>`;
   }).join('');
 }
 const rgInflight = new Set();
 async function loadRecentForVisible(list) {
-  const todo = list.slice(0, 80).filter(p => !Store.recentCache[p.id] && !rgInflight.has(p.id) && (p.league === 'NHL' || p.league === 'SM-liiga' || p.league === 'Mestis'));
+  const todo = list.slice(0, 80).filter(p => !Store.recentCache[p.id] && !rgInflight.has(p.id) && (p.league === 'NHL' || p.league === 'SM-liiga' || p.league === 'Mestis' || p.league === 'SHL' || p.league === 'HockeyAllsvenskan'));
   if (!todo.length) return;
   const apply = p => { document.querySelectorAll('[data-rg]').forEach(el => { if (el.dataset.rg === p.id) el.innerHTML = recentCellHTML(p); }); };
   await pool(todo, 4, async p => { rgInflight.add(p.id); try { await Store.recentGames(p); } catch (e) { } rgInflight.delete(p.id); if (!Store.recentCache[p.id]) { document.querySelectorAll('[data-rg]').forEach(el => { if (el.dataset.rg === p.id) el.innerHTML = '<span class="muted">–</span>'; }); } else apply(p); });
 }
+
+
+// ---- Näppäimistökäyttö ja ruudunlukija ----
+(function () {
+  const SEL = 'div[data-act],span[data-act],div[data-sort],div.card.team[data-team],.gamerow.click,a[data-teamres]';
+  let pend = null, tid = 0, rovedEl = null;
+  function enhance() {
+    document.querySelectorAll(SEL).forEach(el => {
+      const act = el.dataset.act;
+      if (act === 'cmp') { el.setAttribute('role', 'checkbox'); el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false'); el.setAttribute('aria-label', 'Valitse vertailuun'); }
+      else if (act === 'star') { el.setAttribute('role', 'button'); el.setAttribute('aria-label', el.dataset.n + '/3 tähteä'); el.setAttribute('aria-pressed', el.classList.contains('on') ? 'true' : 'false'); }
+      else if (el.dataset.sort) { el.setAttribute('role', 'button'); el.setAttribute('aria-sort', el.classList.contains('on') ? (UI.asc ? 'ascending' : 'descending') : 'none'); }
+      else if (!el.getAttribute('role')) el.setAttribute('role', 'button');
+      if (el.closest('#tbody')) { if (el.tabIndex !== 0 && !el.hasAttribute('data-kb')) { el.setAttribute('data-kb', ''); el.tabIndex = -1; } }
+      else if (!el.hasAttribute('tabindex')) el.tabIndex = 0;
+    });
+    const first = document.querySelector('#tbody .trow');
+    if (first && !(rovedEl && rovedEl.isConnected)) first.querySelectorAll('[data-kb]').forEach(x => { x.tabIndex = 0; });
+    document.querySelectorAll('.stars').forEach(g => { g.setAttribute('role', 'group'); g.setAttribute('aria-label', 'Arvostelu'); });
+    if (pend) {
+      const q = `#tbody [data-act="${pend.act}"][data-id="${CSS.escape(pend.id)}"]${pend.n ? `[data-n="${pend.n}"]` : ''}`;
+      const t = document.querySelector(q); if (t) { t.tabIndex = 0; t.focus({ preventScroll: true }); } pend = null;
+    }
+  }
+  new MutationObserver(() => { clearTimeout(tid); tid = setTimeout(enhance, 40); }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('focusin', e => {
+    const el = e.target.closest && e.target.closest('#tbody [data-kb]'); if (!el) return;
+    if (rovedEl && rovedEl !== el && rovedEl.isConnected) rovedEl.tabIndex = -1;
+    el.tabIndex = 0; rovedEl = el;
+  });
+  document.addEventListener('keydown', e => {
+    const el = e.target; if (!el || !el.matches) return;
+    if ((e.key === 'Enter' || e.key === ' ') && el.matches(SEL)) {
+      e.preventDefault();
+      if (el.closest('#tbody') && el.dataset.id) pend = { act: el.dataset.act, id: el.dataset.id, n: el.dataset.n || '' };
+      el.click(); return;
+    }
+    const kb = el.closest && el.closest('#tbody [data-kb]');
+    if (kb && ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+      const row = kb.closest('.trow'); if (!row) return;
+      const same = r => r && Array.from(r.querySelectorAll('[data-kb]')).find(x => x.dataset.act === kb.dataset.act && (x.dataset.n || '') === (kb.dataset.n || ''));
+      let t = null;
+      if (e.key === 'ArrowDown') t = same(row.nextElementSibling);
+      else if (e.key === 'ArrowUp') t = same(row.previousElementSibling);
+      else if (e.key === 'Home' && e.ctrlKey) t = same(row.parentElement.firstElementChild);
+      else if (e.key === 'End' && e.ctrlKey) t = same(row.parentElement.lastElementChild);
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const all = Array.from(row.querySelectorAll('[data-kb]')); const i = all.indexOf(kb); t = all[i + (e.key === 'ArrowRight' ? 1 : -1)]; }
+      if (t) { e.preventDefault(); t.focus(); t.scrollIntoView({ block: 'nearest' }); }
+    }
+  });
+})();

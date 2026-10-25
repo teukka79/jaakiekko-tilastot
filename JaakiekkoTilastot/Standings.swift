@@ -137,7 +137,7 @@ struct StandingsView: View {
                     .buttonStyle(.plain).foregroundStyle(Theme.muted)
             }
             HStack(spacing: 8) {
-                ForEach([League.nhl, League.ahl, League.liiga, League.mestis]) { l in
+                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan]) { l in
                     Button(l.label) { league = l }.buttonStyle(GhostButtonStyle(active: league == l))
                 }
                 Spacer()
@@ -184,7 +184,7 @@ struct StandingsView: View {
                                            byDivision: byDivision, games: g, isForm: mode == .form,
                                            side: side, window: window, line: line)
                             Text(mode == .form
-                                 ? "OTT = ottelut, JA-V/JA-H = jatkoaika- tai rankkarivoitot/-tappiot, M = maalit, PIS = pisteet valitulta ajalta. Merkit vanhimmasta uusimpaan; ? = seuraava ottelu (vie hiiri päälle). Oranssi kulma = ratkesi jatkoajalla tai rankkareilla."
+                                 ? "OTT = ottelut, JA-V/JA-H = jatkoaika- tai rankkarivoitot/-tappiot, M = maalit, PIS = pisteet valitulta ajalta. Merkit uusimmasta vanhimpaan; ? = seuraava ottelu (vie hiiri päälle). Oranssi kulma = ratkesi jatkoajalla tai rankkareilla."
                                  : "O = yli \(String(format: "%.1f", line)) maalia (ottelun kaikki maalit), U = alle, M = maalit tehty:päästetty, M/O = maaleja per ottelu. Koko kausi, merkit = viimeiset 5 ottelua.")
                                 .font(.system(size: 11)).foregroundStyle(Theme.muted)
                             if league == .mestis {
@@ -213,6 +213,10 @@ struct StandingsView: View {
                         }
                         Text("O = ottelut, V = voitot, H = tappiot, JH = jatkoaika-/rankkaritappiot, P = pisteet.")
                             .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                        if league == .shl || league == .allsvenskan {
+                            Text("Taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p). Lähde: swehockey.se.")
+                                .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                        }
                         if league == .liiga {
                             Text("Liigan taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p).")
                                 .font(.system(size: 11)).foregroundStyle(Theme.muted)
@@ -253,6 +257,7 @@ struct StandingsView: View {
         case .nhl: r = await fetchNHLStandings(teams: store.teams)
         case .mestis: r = await fetchMestisStandings(teams: store.teams)
         case .ahl: r = await fetchAHLStandings(teams: store.teams, season: await fetchAHLSeasonId())
+        case .shl, .allsvenskan: r = await fetchSweStandings(league: league, teams: store.teams)
         default: r = await fetchLiigaStandings(teams: store.teams)
         }
         if let r { rows = r } else { failed = true }

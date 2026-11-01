@@ -64,7 +64,7 @@ struct RecentStrip: View {
                 Text("–").foregroundStyle(Theme.muted)
             }
         }
-        .task(id: player.id) {
+        .task(id: "\(player.id)-\(store.recentVersion)") {
             let r = await store.recentGames(for: player)
             games = r.games
             loaded = true

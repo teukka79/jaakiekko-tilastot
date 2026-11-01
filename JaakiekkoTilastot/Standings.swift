@@ -127,6 +127,8 @@ struct StandingsView: View {
     @State private var games: [LeagueGame]?
     @State private var gamesLoading = false
     @State private var gamesLeague: League?
+    @State private var hl = RowHighlight()
+    @State private var formStats: [String: TeamFormStats] = [:]
 
     var body: some View {
         VStack(spacing: 14) {
@@ -137,7 +139,7 @@ struct StandingsView: View {
                     .buttonStyle(.plain).foregroundStyle(Theme.muted)
             }
             HStack(spacing: 8) {
-                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan]) { l in
+                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan, League.nl]) { l in
                     Button(l.label) { league = l }.buttonStyle(GhostButtonStyle(active: league == l))
                 }
                 Spacer()
@@ -211,7 +213,7 @@ struct StandingsView: View {
                         } else {
                             section(title: nil, rows: sortStandings(rows))
                         }
-                        Text("O = ottelut, V = voitot, H = tappiot, JH = jatkoaika-/rankkaritappiot, P = pisteet.")
+                        Text("O = ottelut, V = voitot, H = tappiot, JH = jatkoaika-/rankkaritappiot, P = pisteet. Kunto = viimeiset 5 ottelua, ? = seuraava ottelu (vie hiiri päälle, niin joukkueet korostuvat).")
                             .font(.system(size: 11)).foregroundStyle(Theme.muted)
                         if league == .shl || league == .allsvenskan {
                             Text("Taulukko on laskettu ottelutuloksista (voitto 3 p, jatkoaikavoitto 2 p, jatkoaikatappio 1 p). Lähde: swehockey.se.")
@@ -226,10 +228,19 @@ struct StandingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 900, height: 760)
+        .frame(width: 900, height: windowHeight)
         .background(AppBackground())
         .task(id: league) { await load() }
-        .task(id: "\(league.rawValue)-\(mode == .table)") { await loadGames() }
+        .task(id: league) { await loadGames() }
+    }
+
+    /// Ikkunan korkeus seuraa joukkueiden määrää (enintään näytön korkeus).
+    private var windowHeight: CGFloat {
+        let n = store.teams.filter { $0.league == league }.count
+        let sections: CGFloat = ((league == .nhl || league == .ahl) && byDivision && mode == .table) ? 4 : 1
+        let wanted = 230 + CGFloat(n) * 37 + sections * 30
+        let maxH = (NSScreen.main?.visibleFrame.height ?? 900) - 60
+        return min(max(wanted, 520), maxH)
     }
 
     private var divisionKeys: [String] {
@@ -242,11 +253,11 @@ struct StandingsView: View {
     }
 
     private func loadGames() async {
-        guard mode != .table, !(games != nil && gamesLeague == league) else { return }
+        guard !(games != nil && gamesLeague == league) else { return }
         gamesLoading = true
         let lg = league
         let g = await fetchLeagueGames(league: lg, teams: store.teams)
-        if lg == league { games = g; gamesLeague = lg }
+        if lg == league { games = g; gamesLeague = lg; formStats = g.map { computeFormStats($0, lg) } ?? [:] }
         gamesLoading = false
     }
 
@@ -258,14 +269,48 @@ struct StandingsView: View {
         case .mestis: r = await fetchMestisStandings(teams: store.teams)
         case .ahl: r = await fetchAHLStandings(teams: store.teams, season: await fetchAHLSeasonId())
         case .shl, .allsvenskan: r = await fetchSweStandings(league: league, teams: store.teams)
+        case .nl: r = await fetchNLStandings(teams: store.teams)
         default: r = await fetchLiigaStandings(teams: store.teams)
         }
         if let r { rows = r } else { failed = true }
         loading = false
     }
 
+    /// Joukkueen viimeiset 5 ottelua (kunto) sarjataulukkoon.
+    private var formMap: [String: TeamFormStats] { gamesLeague == league ? formStats : [:] }
+
+    private func computeFormStats(_ g: [LeagueGame], _ lg: League) -> [String: TeamFormStats] {
+        let stats = computeTeamForm(games: g, teamNames: store.teams.filter { $0.league == lg }.map { $0.name },
+                                    league: lg, side: .all, window: 5, line: 4.5)
+        return Dictionary(stats.map { ($0.team, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    private func nextTip(_ s: TeamFormStats) -> String {
+        guard let n = s.next else { return "Ei tulevia otteluita" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "fi_FI")
+        f.dateFormat = "dd.MM.yyyy"
+        return "Seuraava ottelu:\n\(n.home) · \(n.away)\n\(f.string(from: n.date))"
+    }
+
+    private func formBadges(_ s: TeamFormStats?) -> some View {
+        HStack(spacing: 3) {
+            if let s {
+                FormBadge(text: "?", kind: .unknown, tip: nextTip(s), onHover: { hl.teams = $0 ? Set(s.next.map { [$0.home, $0.away] } ?? []) : [] })
+                ForEach(Array(s.recent.reversed())) { x in
+                    FormBadge(text: x.win ? "V" : "H", kind: x.win ? .win : .loss, overtime: x.game.extra != nil,
+                              tip: "\(x.home ? "Koti" : "Vieras") · \(x.opp) \(x.gf)–\(x.ga)\(x.game.extra.map { " " + $0 } ?? "")", onHover: { hl.teams = $0 ? [x.game.home, x.game.away] : [] })
+                }
+            } else {
+                Text("…").font(.system(size: 11)).foregroundStyle(Theme.muted)
+            }
+        }
+        .frame(width: 6 * 25, alignment: .leading)
+    }
+
     private func section(title: String?, rows: [StandingRow]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let fm = formMap
+        return VStack(alignment: .leading, spacing: 0) {
             if let title {
                 SectionLabel(title).padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
             }
@@ -286,10 +331,11 @@ struct StandingsView: View {
                         .font(.system(size: 12).monospacedDigit())
                         .foregroundStyle(r.diff > 0 ? Theme.green : r.diff < 0 ? Theme.red : Theme.muted)
                         .frame(width: 40, alignment: .trailing)
+                    formBadges(fm[r.team])
                 }
                 .font(.system(size: 12).monospacedDigit())
                 .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(idx % 2 == 1 ? Color.white.opacity(0.025) : .clear)
+                .background { ZStack { (idx % 2 == 1 ? Color.white.opacity(0.025) : Color.clear); HLOverlay(model: hl, team: r.team) } }
             }
         }
         .padding(.bottom, 6)
@@ -312,6 +358,7 @@ struct StandingsView: View {
             Text("P").frame(width: 40, alignment: .trailing)
             Text("Maalit").frame(width: 64, alignment: .trailing)
             Text("Ero").frame(width: 40, alignment: .trailing)
+            Text("KUNTO").frame(width: 6 * 25, alignment: .center)
         }
         .font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.muted)
         .padding(.horizontal, 12).padding(.vertical, 6)

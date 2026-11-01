@@ -8,6 +8,7 @@ function parseSeed() {
     switch (c[0]) {
       case 'NHL': case 'AHL': flag = (c.length > 3 && c[3] === 'CA') ? '🇨🇦' : '🇺🇸'; break;
       case 'SM-liiga': case 'Mestis': flag = '🇫🇮'; break;
+      case 'National League': flag = '🇨🇭'; break;
       default: flag = '🇸🇪';
     }
     teams.push({ name: c[1], abbr: c[2], league: c[0], flag });
@@ -37,7 +38,7 @@ const slotLabel = p => ({ C: 'Keskushyökkääjä', L: 'Vasen laita', R: 'Oikea 
 // ---------- Store ----------
 const Store = {
   teams: [], teamByName: {}, teamByAbbr: {}, seedPlayers: [], players: [],
-  state: { ratings: {}, notes: {}, edits: {}, logos: {}, customPlayers: [], sweGames: {}, liveSwe: {}, live: null, liveLiiga: null, liveAHL: null, liveMestis: null, autoLogos: {}, liveEP: {} },
+  state: { ratings: {}, notes: {}, edits: {}, logos: {}, customPlayers: [], sweGames: {}, liveSwe: {}, live: null, liveLiiga: null, liveAHL: null, liveMestis: null, liveNL: null, nlAgg: null, autoLogos: {}, liveEP: {}, goalies: [] },
   status: { nhl: 'NHL: ei haettu', liiga: 'Liiga: ei haettu', ahl: 'AHL: ei haettu', mestis: 'Mestis: ei haettu', swe: 'SHL/HA: ei haettu', ep: 'SHL/HA: ei haettu' },
   hasEPKey: false, epKey: null, isRefreshing: false, liveGamesOn: false,
   toast: null, settings: {},
@@ -156,6 +157,12 @@ const Store = {
       const i = st.liveAHL.info && st.liveAHL.info[key];
       out.push(mk('ahl-' + (e.playerId ?? key), e.name, team, 'AHL', { pos: e.pos === 'D' ? 'D' : 'F', games: e.games, goals: e.goals, assists: e.assists, pim: e.pim ?? null, plusMinus: e.plusMinus ?? null, shots: e.shots ?? null, slot: e.pos, ppPoints: e.ppPoints ?? null, number: i ? i.number ?? null : null }));
     }
+    if (st.liveNL) for (const [key, list] of Object.entries(st.liveNL.byName || {})) for (const e of list) {
+      const tag = 'National League|' + key; const team = this.teamByName[e.abbr];
+      if (have.has(tag) || !e.name || !team) continue; have.add(tag);
+      const i = st.liveNL.info && st.liveNL.info[key];
+      out.push(mk('nl-' + key, e.name, team, 'National League', { pos: e.pos, games: e.games, goals: e.goals, assists: e.assists, pim: e.pim ?? null, plusMinus: e.plusMinus ?? null, shots: e.shots ?? null, ppPoints: e.ppPoints ?? null, number: i ? i.number ?? null : null }));
+    }
     if (st.liveMestis) for (const [key, list] of Object.entries(st.liveMestis.byName)) for (const e of list) {
       const tag = 'Mestis|' + key; const team = this.teamByName[e.abbr];
       if (have.has(tag) || !e.name || !team) continue; have.add(tag);
@@ -206,18 +213,25 @@ const Store = {
   // Hakee puuttuvat SHL- ja HockeyAllsvenskan-logot TheSportsDB:stä (kerran viikossa per joukkue)
   async fetchMissingLogos() {
     this.state.logoTried ||= {};
-    const wk = 7 * 86400000;
-    const need = this.teams.filter(t => (t.league === 'SHL' || t.league === 'HockeyAllsvenskan') && !this.logoRaw(t.name) && Date.now() - (this.state.logoTried[t.name] || 0) > wk);
+    const wk = 7 * 86400000, tk = t => t.league === 'National League' ? t.name + '#3' : t.name;
+    const need = this.teams.filter(t => (t.league === 'SHL' || t.league === 'HockeyAllsvenskan' || t.league === 'National League') && !this.logoRaw(t.name) && Date.now() - (this.state.logoTried[tk(t)] || 0) > wk);
     let found = false;
-    for (const t of need) {
-      this.state.logoTried[t.name] = Date.now();
-      try {
-        const j = await getJSON('https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=' + encodeURIComponent(t.name), 15000);
-        const list = (j && j.teams) || [];
-        const hit = list.find(x => x.strSport === 'Ice Hockey' && x.strCountry === 'Sweden') || list.find(x => x.strSport === 'Ice Hockey');
-        if (hit && hit.strBadge) { this.state.autoLogos[t.name] = hit.strBadge; found = true; }
-      } catch {}
-      await new Promise(r => setTimeout(r, 1500));
+    const NLB = { 'Genève-Servette HC': '9zq0sa1647290526', 'EHC Biel-Bienne': 'oy3z7j1647290451', 'EHC Kloten': 'f37tvd1626190829', 'HC Lugano': 'l7m2vl1647290511' };
+    for (const [n, id] of Object.entries(NLB)) if (this.teamByName[n] && !this.logoRaw(n)) { this.state.autoLogos[n] = 'https://r2.thesportsdb.com/images/media/team/badge/' + id + '.png'; found = true; }
+    for (const t of need.filter(t => !this.logoRaw(t.name))) {
+      this.state.logoTried[tk(t)] = Date.now();
+      const nl = t.league === 'National League', plain = t.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const queries = [t.name]; if (nl && plain !== t.name) queries.push(plain);
+      if (nl) { let sh = plain.replace(/^(HC|EHC|SC|EV) /, '').replace(/ HC$/, ''); for (const q of [sh, sh.replace(/-/g, ' ')]) if (!queries.includes(q)) queries.push(q); }
+      for (const q of queries) {
+        try {
+          const j = await getJSON('https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=' + encodeURIComponent(q), 15000);
+          const list = (j && j.teams) || [];
+          const hit = list.find(x => x.strSport === 'Ice Hockey' && x.strCountry === (nl ? 'Switzerland' : 'Sweden')) || (nl ? null : list.find(x => x.strSport === 'Ice Hockey'));
+          if (hit && hit.strBadge) { this.state.autoLogos[t.name] = hit.strBadge; found = true; break; }
+        } catch {}
+        await new Promise(r => setTimeout(r, 1500));
+      }
     }
     if (need.length) this.persist();
     if (found) this.emit();
@@ -271,7 +285,7 @@ const Store = {
     if (this.isRefreshing) return;
     this.isRefreshing = true; this.emit('status'); this.lastFullRefresh = Date.now();
     try {
-      await this.refreshNHL(); await this.refreshLiiga(); await this.refreshAHL(); await this.refreshMestis(); await this.refreshSwe();
+      await this.refreshNHL(); await this.refreshLiiga(); await this.refreshAHL(); await this.refreshMestis(); await this.refreshSwe(); await this.refreshNL(); await this.refreshGoalies();
       this.notifyArmed = true;
       if (this.hasEPKey && (force || !this.lastEPFetch || Date.now() - this.lastEPFetch > 7200000)) await this.refreshEP();
     } finally { this.isRefreshing = false; this.emit(); }
@@ -391,6 +405,16 @@ const Store = {
     this.checkScoringNotifications();
   },
 
+  async refreshGoalies() {
+    try {
+      let merged = this.state.goalies || [];
+      const rep = (lg, list) => { if (list && list.length) merged = merged.filter(g => g.league !== lg).concat(list); };
+      const season = await fetchAHLSeasonId(); const ids = (await fetchAHLTeams(season)).map(t => t.id);
+      const [nhl, liiga, ahl] = await Promise.all([fetchNHLGoalies(this.teamByAbbr), fetchLiigaGoalies(this.teams), fetchAHLGoalies(this.teams, season, ids)]);
+      rep('NHL', nhl); rep('SM-liiga', liiga); rep('AHL', ahl);
+      this.state.goalies = merged; this.persist(); this.emit();
+    } catch {}
+  },
   async refreshAHL() {
     this.status.ahl = 'Päivitetään AHL…'; this.emit('status');
     const season = await fetchAHLSeasonId(); const feedTeams = await fetchAHLTeams(season);
@@ -411,6 +435,57 @@ const Store = {
     this.checkScoringNotifications();
   },
 
+  applyNLAgg(snap) {
+    const agg = this.state.nlAgg; if (!agg || !agg.processed.length) return;
+    snap.info = snap.info || {};
+    for (const [k, list] of Object.entries(snap.byName)) {
+      for (const e of list) { e.shots = agg.sog[k] || 0; e.ppPoints = agg.pp[k] || 0; }
+      if (agg.num[k] != null) snap.info[k] = { number: agg.num[k], nat: null };
+    }
+  },
+  async refreshNL() {
+    const sk = await fetchNLSkaters(this.teams);
+    if (sk) {
+      const byName = {}; for (const s of sk) (byName[norm(s.name)] ||= []).push({ abbr: s.team, pos: s.pos, games: s.games, goals: s.goals, assists: s.assists, pim: s.pim, plusMinus: s.plusMinus, name: s.name });
+      const old = this.state.liveNL || {}; const snap = { ...old, byName, timestamp: new Date().toISOString() }; this.applyNLAgg(snap); this.state.liveNL = snap;
+    }
+    const g = await fetchNLGoalies(this.teams);
+    if (g && g.length) this.state.goalies = (this.state.goalies || []).filter(x => x.league !== 'National League').concat(g);
+    this.persist(); this.rebuild(); this.emit();
+    try {
+      const games = this.state.liveNL && await fetchNLGames(this.teams); if (!games) return;
+      const fin = games.filter(x => x.final).sort((a, b) => b.date - a.date);
+      const gid = x => x.id.slice(3);
+      const perTeam = {}; for (const x of fin) for (const t of [x.home, x.away]) { const l = (perTeam[t] ||= []); if (l.length < 5) l.push(x); }
+      const agg = this.state.nlAgg || { processed: [], num: {}, sog: {}, pp: {} }; const done = new Set(agg.processed);
+      const unprocessed = fin.map(gid).filter(id => !done.has(id));
+      const ids = [...new Set([...unprocessed, ...Object.values(perTeam).flat().map(gid)])].filter(id => !nlScoringCache[id]);
+      await pool(ids, 6, id => fetchNLGameScoring(id));
+      for (let n = 0; n < 2; n++) { const miss = [...new Set([...unprocessed, ...Object.values(perTeam).flat().map(gid)])].filter(id => !nlScoringCache[id]); if (!miss.length) break; for (const id of miss) await fetchNLGameScoring(id); }
+      for (const id of unprocessed) {
+        const s = nlScoringCache[id]; if (!s) continue;
+        Object.assign(agg.num, s.num); for (const [k, v] of Object.entries(s.sog)) agg.sog[k] = (agg.sog[k] || 0) + v; for (const [k, v] of Object.entries(s.pp)) agg.pp[k] = (agg.pp[k] || 0) + v;
+        agg.processed.push(id);
+      }
+      this.state.nlAgg = agg;
+      const ymd = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(d);
+      const teamRecent = {}, recent = {}, hot = [];
+      for (const [team, list] of Object.entries(perTeam)) {
+        const rows = list.map(x => { const home = x.home === team; return { date: ymd(x.date), opponent: home ? x.away : x.home, home, goals: 0, assists: 0, pp: null }; });
+        teamRecent[team] = rows;
+        const sc = list.map(x => nlScoringCache[gid(x)] || null);
+        const keys = new Set(); for (const s of sc) if (s) { Object.keys(s.goals).forEach(k => keys.add(k)); Object.keys(s.assists).forEach(k => keys.add(k)); }
+        for (const k of keys) {
+          if (!((this.state.liveNL.byName[k]) || []).some(e => e.abbr === team)) continue; // vastustajan pelaajat ohitetaan
+          const pg = []; sc.forEach((s, i) => { if (!s) return; const gg = s.goals[k] || 0, aa = s.assists[k] || 0; if (gg + aa > 0) pg.push({ ...rows[i], goals: gg, assists: aa, pp: s.pp[k] || 0, shots: s.sog[k] ?? null }); });
+          if (pg.length) recent[k] = pg;
+          if (sc.length >= 4 && sc.slice(0, 4).every(s => s && (s.goals[k] || 0) + (s.assists[k] || 0) > 0)) hot.push(k);
+        }
+      }
+      Object.assign(this.state.liveNL, { teamRecent, recent, hot }); this.applyNLAgg(this.state.liveNL);
+      this.persist(); this.rebuild(); for (const p of this.players) if (p.league === 'National League') delete this.recentCache[p.id]; this.emit();
+    } catch (e) { }
+  },
   async refreshMestis() {
     this.status.mestis = 'Päivitetään Mestis…'; this.emit('status');
     const skaters = await fetchMestisSkaters();
@@ -441,6 +516,7 @@ const Store = {
     if (p.league === 'NHL') return !!(this.state.live && this.state.live.hot && this.state.live.hot.includes(k));
     if (p.league === 'SM-liiga') return !!(this.state.liveLiiga && this.state.liveLiiga.hot && this.state.liveLiiga.hot.includes(k));
     if (p.league === 'SHL' || p.league === 'HockeyAllsvenskan') { const sw = this.state.liveSwe && this.state.liveSwe[p.league]; return !!(sw && sw.hot && sw.hot.includes(p.team + '|' + k)); }
+    if (p.league === 'National League') return !!(this.state.liveNL && this.state.liveNL.hot && this.state.liveNL.hot.includes(k));
     return false;
   },
 
@@ -513,6 +589,13 @@ const Store = {
         res.games = tl.map(tg => { const m = mine.find(x => x.id === tg.id); return m ? { ...m } : { id: tg.id, date: tg.date, opponent: tg.opponent, home: tg.home, goals: 0, assists: 0, pp: 0 }; });
         res.note = 'Swehockey: joukkueen viimeiset 5 ottelua. Laukauksia ei saada pelaajakohtaisesti, eikä poissaolo erotu pisteettömästä ottelusta.';
       } else res.note = 'SHL/HA-pelaajatietoja ei ole vielä haettu. Paina Päivitä.';
+    } else if (p.league === 'National League') {
+      const L = this.state.liveNL || {}; const mine = (L.recent && L.recent[norm(p.name)]) || [];
+      const tl = L.teamRecent && L.teamRecent[p.team]; const gid = g => g.date + g.opponent;
+      if (tl && tl.length) {
+        res.games = tl.map(tg => mine.find(m => gid(m) === gid(tg)) || tg);
+        res.note = 'National League: joukkueen viimeiset 5 ottelua. Rajapinta ei kerro, pelasiko pelaaja kaikissa, joten pisteetön ottelu voi olla myös poissaolo.';
+      } else res.note = 'National League -pelitietoja ei ole vielä haettu. Paina Päivitä.';
     } else if (p.league === 'Mestis') {
       const e = this.state.liveMestis && (this.state.liveMestis.byName[norm(p.name)] || [])[0];
       if (e && e.link) { const g = await fetchMestisGameLog(e.link, p.team); if (g) { res.games = g; if (!g.length) res.note = 'Ei pelattuja otteluja tällä kaudella.'; } else res.note = 'Ottelulokin haku epäonnistui.'; }

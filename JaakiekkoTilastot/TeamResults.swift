@@ -136,13 +136,26 @@ func fetchTeamResults(team: Team, allTeams: [Team]) async -> TeamResultsData? {
         }
         return TeamResultsData(games: lastFive(out), note: "Jatkoaika- ja rankkaritietoa ei ole saatavilla tälle sarjalle.")
 
-    case .shl, .allsvenskan:
-        guard let games = await fetchSweGames(league: team.league, teams: allTeams) else { return nil }
+    case .nl:
+        guard let games = await fetchNLGames(teams: allTeams) else { return nil }
         let out: [TeamResultGame] = games.compactMap { g in
             guard g.final, g.home == team.name || g.away == team.name else { return nil }
             let isHome = g.home == team.name
             return TeamResultGame(id: g.id, date: g.date, opponent: isHome ? g.away : g.home,
                                   home: isHome, gf: isHome ? g.hs : g.aw, ga: isHome ? g.aw : g.hs, extra: g.extra)
+        }
+        return TeamResultsData(games: lastFive(out))
+
+    case .shl, .allsvenskan:
+        guard let games = await fetchSweGames(league: team.league, teams: allTeams) else { return nil }
+        let out: [TeamResultGame] = games.compactMap { g in
+            guard g.final, g.home == team.name || g.away == team.name else { return nil }
+            let isHome = g.home == team.name
+            var sg = ScheduleGame(id: g.id, date: g.date, home: g.home, away: g.away)
+            sg.final = true; sg.homeScore = g.hs; sg.awayScore = g.aw; sg.sweGid = g.gid; sg.sweExtra = g.extra
+            return TeamResultGame(id: g.id, date: g.date, opponent: isHome ? g.away : g.home,
+                                  home: isHome, gf: isHome ? g.hs : g.aw, ga: isHome ? g.aw : g.hs, extra: g.extra,
+                                  game: g.gid == nil ? nil : sg)
         }
         return TeamResultsData(games: lastFive(out))
     }
@@ -211,6 +224,7 @@ struct TeamResultsView: View {
         }
         .padding(20)
         .frame(width: 520, height: 470)
+        .background(AppBackground())
         .task { await load() }
         .sheet(item: $selected) { GameDetailView(game: $0) }
     }

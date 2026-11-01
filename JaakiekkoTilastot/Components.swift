@@ -6,28 +6,52 @@ import UniformTypeIdentifiers
 
 @MainActor
 enum LogoLoader {
-    private static var cache: [URL: NSImage] = [:]
+    private static var cache: [String: NSImage] = [:]
     private static var failed: Set<URL> = []
 
-    static func load(_ url: URL) async -> NSImage? {
-        if let img = cache[url] { return img }
+    /// maxPixel > 0: kuva pienennetään tarkasti (ImageIO) tähän pikselikokoon, jolloin pieni logo ei ole epätarkka.
+    static func load(_ url: URL, maxPixel: Int = 0) async -> NSImage? {
+        let key = "\(url.absoluteString)#\(maxPixel)"
+        if let img = cache[key] { return img }
         if failed.contains(url) { return nil }
-        // Pysyvä levyvälimuisti: ladattu logo tallennetaan, eikä sitä haeta uudelleen
-        if let data = LogoDisk.read(url), let img = NSImage(data: data) {
-            cache[url] = img
-            return img
-        }
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200, let img = NSImage(data: data) else {
+        var data: Data? = LogoDisk.read(url)
+        if data == nil {
+            do {
+                let (d, response) = try await URLSession.shared.data(from: url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: d) != nil else {
+                    failed.insert(url); return nil
+                }
+                LogoDisk.write(d, for: url)
+                data = d
+            } catch {
                 failed.insert(url); return nil
             }
-            LogoDisk.write(data, for: url)
-            cache[url] = img
-            return img
-        } catch {
-            failed.insert(url); return nil
         }
+        guard let data else { return nil }
+        if maxPixel > 0, let scaled = downsample(data, maxPixel: maxPixel) {
+            cache[key] = scaled
+            return scaled
+        }
+        guard let img = NSImage(data: data) else { failed.insert(url); return nil }
+        cache[key] = img
+        return img
+    }
+
+    private static func downsample(_ data: Data, maxPixel: Int) -> NSImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let w = props[kCGImagePropertyPixelWidth] as? Int, w > maxPixel else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        // Pikselikoko 3x näyttökokoon nähden: piirretään pisteinä maxPixel/3
+        let pts = CGFloat(maxPixel) / 3
+        let ratio = CGFloat(cg.height) / CGFloat(max(cg.width, 1))
+        return NSImage(cgImage: cg, size: NSSize(width: pts, height: pts * ratio))
     }
 }
 
@@ -56,7 +80,7 @@ struct TeamLogoView: View {
         .frame(width: size, height: size)
         .task(id: url) {
             image = nil
-            if let url { image = await LogoLoader.load(url) }
+            if let url { image = await LogoLoader.load(url, maxPixel: Int((size * 3).rounded())) }
         }
     }
 }

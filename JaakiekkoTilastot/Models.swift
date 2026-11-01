@@ -9,6 +9,7 @@ enum League: String, CaseIterable, Identifiable, Codable {
     case mestis = "Mestis"
     case shl = "SHL"
     case allsvenskan = "HockeyAllsvenskan"
+    case nl = "National League"
 
     var id: String { rawValue }
 
@@ -20,6 +21,7 @@ enum League: String, CaseIterable, Identifiable, Codable {
         case .mestis: return "Mestis"
         case .shl: return "SHL"
         case .allsvenskan: return "HockeyAllsvenskan"
+        case .nl: return "NL"
         }
     }
 
@@ -28,6 +30,7 @@ enum League: String, CaseIterable, Identifiable, Codable {
         case .nhl, .ahl: return "🇺🇸 🇨🇦"
         case .liiga, .mestis: return "🇫🇮"
         case .shl, .allsvenskan: return "🇸🇪"
+        case .nl: return "🇨🇭"
         }
     }
 }
@@ -209,6 +212,10 @@ struct AppState: Codable {
     var liveLiiga: LiveSnapshot?
     var liveAHL: LiveSnapshot?
     var liveMestis: LiveSnapshot?
+    /// Sveitsin National League: pelaajatilastot.
+    var liveNL: LiveSnapshot?
+    /// NL: kertyneet laukaukset, ylivoimapisteet ja numerot ottelukohtaisista tiedoista.
+    var nlAgg: NLAgg?
     /// Rajapinnoista haetut joukkuelogot (joukkueen nimi -> URL).
     var autoLogos: [String: String]?
     /// Elite Prospects -rajapinnasta haetut tilastot sarjoittain (SHL, HockeyAllsvenskan).
@@ -217,6 +224,8 @@ struct AppState: Codable {
     var liveSwe: [String: SweSnapshot]?
     /// Haetut ottelutapahtumat (sarja -> ottelun tunnus -> tapahtumat), jotta päättyneitä pelejä ei haeta uudelleen.
     var sweEvents: [String: [String: SweEvents]]?
+    /// Maalivahtien kausitilastot (NHL, AHL, Liiga).
+    var goalies: [Goalie]?
 }
 
 /// JSON-varmuuskopio. Kentät ovat samat kuin web-version viennissä, joten tiedostot kelpaavat molempiin suuntiin.

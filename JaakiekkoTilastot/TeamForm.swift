@@ -104,6 +104,10 @@ func fetchLeagueGames(league: League, teams: [Team]) async -> [LeagueGame]? {
             return LeagueGame(date: g.date, home: g.home, away: g.away, final: false, hs: 0, aw: 0)
         }
 
+    case .nl:
+        guard let games = await fetchNLGames(teams: teams) else { return nil }
+        return games.map { LeagueGame(date: $0.date, home: $0.home, away: $0.away, final: $0.final, hs: $0.hs, aw: $0.aw, extra: $0.extra) }
+
     case .shl, .allsvenskan:
         guard let games = await fetchSweGames(league: league, teams: teams) else { return nil }
         return games.map { LeagueGame(date: $0.date, home: $0.home, away: $0.away, final: $0.final, hs: $0.hs, aw: $0.aw, extra: $0.extra) }
@@ -190,12 +194,26 @@ private let formFullDateFormatter: DateFormatter = {
     return f
 }()
 
+/// Korostetut joukkueet. Erillinen havaittava olio, jotta hiiren liike ei piirrä koko taulukkoa uudelleen.
+@Observable final class RowHighlight {
+    var teams: Set<String> = []
+}
+
+struct HLOverlay: View {
+    let model: RowHighlight
+    let team: String
+    var body: some View {
+        (model.teams.contains(team) ? Theme.cyan.opacity(0.16) : Color.clear).allowsHitTesting(false)
+    }
+}
+
 struct FormBadge: View {
     enum Kind { case win, loss, unknown }
     let text: String
     let kind: Kind
     var overtime = false
     let tip: String
+    var onHover: ((Bool) -> Void)? = nil
 
     var body: some View {
         Text(text)
@@ -214,6 +232,7 @@ struct FormBadge: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .help(tip)
+            .onHover { onHover?($0) }
     }
 
     private var color: Color {
@@ -235,6 +254,8 @@ struct TeamFormTables: View {
     let side: FormSide
     let window: Int
     let line: Double
+    /// Korostetut joukkueet (hiiri "?"-merkin päällä: seuraavan ottelun joukkueet)
+    @State private var hl = RowHighlight()
 
     var body: some View {
         let stats = computeTeamForm(games: games, teamNames: teamNames, league: league, side: side, window: window, line: line)
@@ -336,9 +357,9 @@ struct TeamFormTables: View {
                 cell("\(s.gf):\(s.ga)", 52, color: Theme.muted)
                 cell("\(s.pts)", 34, bold: true, color: Theme.cyan)
                 HStack(spacing: 3) {
-                    FormBadge(text: "?", kind: .unknown, tip: nextTip(s))
+                    FormBadge(text: "?", kind: .unknown, tip: nextTip(s), onHover: { hl.teams = $0 ? Set(s.next.map { [$0.home, $0.away] } ?? []) : [] })
                     ForEach(Array(s.recent.reversed())) { x in
-                        FormBadge(text: x.win ? "V" : "H", kind: x.win ? .win : .loss, overtime: x.game.extra != nil, tip: resTip(x))
+                        FormBadge(text: x.win ? "V" : "H", kind: x.win ? .win : .loss, overtime: x.game.extra != nil, tip: resTip(x), onHover: { hl.teams = $0 ? [x.game.home, x.game.away] : [] })
                     }
                 }
                 .frame(width: CGFloat(window + 1) * 25, alignment: .leading)
@@ -347,16 +368,16 @@ struct TeamFormTables: View {
                 cell("\(s.allGf):\(s.allGa)", 56, color: Theme.muted)
                 cell(s.allGp > 0 ? String(format: "%.1f", s.avgGoals) : "–", 38, bold: true, color: Theme.cyan)
                 HStack(spacing: 3) {
-                    FormBadge(text: "?", kind: .unknown, tip: nextTip(s))
+                    FormBadge(text: "?", kind: .unknown, tip: nextTip(s), onHover: { hl.teams = $0 ? Set(s.next.map { [$0.home, $0.away] } ?? []) : [] })
                     ForEach(Array(s.last5.reversed())) { x in
                         let over = Double(x.total) > line
-                        FormBadge(text: over ? "+" : "−", kind: over ? .win : .loss, tip: resTip(x) + " · maaleja \(x.total)")
+                        FormBadge(text: over ? "+" : "−", kind: over ? .win : .loss, tip: resTip(x) + " · maaleja \(x.total)", onHover: { hl.teams = $0 ? [x.game.home, x.game.away] : [] })
                     }
                 }
                 .frame(width: 6 * 25, alignment: .leading)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 4)
-        .background(idx % 2 == 1 ? Color.white.opacity(0.025) : .clear)
+        .background { ZStack { (idx % 2 == 1 ? Color.white.opacity(0.025) : Color.clear); HLOverlay(model: hl, team: s.team) } }
     }
 }

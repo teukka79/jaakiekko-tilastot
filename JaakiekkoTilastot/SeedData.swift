@@ -123,6 +123,20 @@ Mestis|K-Vantaa|KVA
 Mestis|Pyry|PYR
 Mestis|RoKi|ROK
 Mestis|TUTO Hockey|TUT
+National League|ZSC Lions|ZSC
+National League|HC Ambri-Piotta|HCAP
+National League|Fribourg-Gottéron|FRI
+National League|Genève-Servette HC|GSHC
+National League|SCL Tigers|SCL
+National League|SC Bern|SCB
+National League|Lausanne HC|LHC
+National League|EV Zug|EVZ
+National League|HC Ajoie|HCA
+National League|HC Davos|HCD
+National League|EHC Biel-Bienne|EHCB
+National League|HC Lugano|HCL
+National League|SC Rapperswil-Jona Lakers|SCRJ
+National League|EHC Kloten|EHCK
 """
 
     // Joukkue|Pelaaja|Pelipaikka|Kansallisuus|O|M|S|(web-version id)

@@ -118,7 +118,7 @@ func fetchSweSchedule(league: League, teams: [Team]) async -> [ScheduleGame]? {
     guard let games = await fetchSweGames(league: league, teams: teams) else { return nil }
     return games.map { g in
         var s = ScheduleGame(id: g.id, date: g.date, home: g.home, away: g.away)
-        if g.final { s.final = true; s.homeScore = g.hs; s.awayScore = g.aw }
+        if g.final { s.final = true; s.homeScore = g.hs; s.awayScore = g.aw; s.sweGid = g.gid; s.sweExtra = g.extra }
         return s
     }
 }

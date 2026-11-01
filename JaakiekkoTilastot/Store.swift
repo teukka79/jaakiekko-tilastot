@@ -199,12 +199,17 @@ final class AppStore {
     var ahlStatus = "AHL: ei haettu"
     var mestisStatus = "Mestis: ei haettu"
     var sweStatus = "SHL/HA: ei haettu"
+    var nlStatus = ""
+    /// Kasvaa, kun viimeisten pelien välimuisti tyhjennetään (ruudut lataavat tiedot uudelleen).
+    var recentVersion = 0
     var epStatus = "SHL/HA: ei haettu"
     var hasEPKey = Keychain.get("eliteprospects") != nil
+    /// Kasvaa, kun Odds API -avain muuttuu (päivittää asetusnäkymän).
+    var oddsKeyVersion = 0
     private var lastEPFetch: Date?
     /// SHL/HA näkyy yläpalkissa vain onnistuneen haun jälkeen; virheet näkyvät Asetukset-ikkunassa.
     var epOK: Bool { epStatus.contains("päivitetty") || epStatus.contains("tallennettu") }
-    var liveStatus: String { nhlStatus + " · " + liigaStatus + " · " + ahlStatus + " · " + mestisStatus + " · " + sweStatus + (hasEPKey && epOK ? " · " + epStatus : "") }
+    var liveStatus: String { nhlStatus + " · " + liigaStatus + " · " + ahlStatus + " · " + mestisStatus + " · " + sweStatus + (nlStatus.isEmpty ? "" : " · " + nlStatus) + (hasEPKey && epOK ? " · " + epStatus : "") }
     var isRefreshing = false
     var toast: String?
 
@@ -251,6 +256,7 @@ final class AppStore {
             case .nhl: flag = (c.count > 3 && c[3] == "CA") ? "🇨🇦" : "🇺🇸"
             case .liiga, .mestis: flag = "🇫🇮"
             case .shl, .allsvenskan: flag = "🇸🇪"
+            case .nl: flag = "🇨🇭"
             case .ahl: flag = (c.count > 3 && c[3] == "CA") ? "🇨🇦" : "🇺🇸"
             }
             teams.append(Team(name: c[1], abbr: c[2], league: lg, flag: flag))
@@ -336,6 +342,7 @@ final class AppStore {
                 p.assists = e?.assists ?? 0
                 if let e, !e.pos.isEmpty {
                     p.games = e.games; p.pim = e.pim; p.plusMinus = e.plusMinus; p.shots = e.shots
+                    if p.pos == nil { p.pos = e.pos }
                 } else {
                     p.games = tg[p.team] ?? 0
                     p.pim = nil; p.plusMinus = nil
@@ -461,6 +468,22 @@ final class AppStore {
                     ap.ppPoints = e.ppPoints
                     ap.number = snap.info?[key]?.number
                     out.append(ap)
+                }
+            }
+        }
+        if let snap = state.liveNL {
+            for (key, list) in snap.byName {
+                for e in list {
+                    let tag = "\(League.nl.rawValue)|\(key)"
+                    guard !have.contains(tag), let name = e.name, let team = teamByName[e.abbr] else { continue }
+                    have.insert(tag)
+                    var np = Player(id: "nl-\(key)", name: name, team: team.name, league: .nl, flag: team.flag,
+                                    pos: e.pos, nat: nil, born: nil, shoots: nil,
+                                    games: e.games, goals: e.goals, assists: e.assists, pim: e.pim, plusMinus: e.plusMinus)
+                    np.shots = e.shots
+                    np.ppPoints = e.ppPoints
+                    np.number = snap.info?[key]?.number
+                    out.append(np)
                 }
             }
         }
@@ -626,6 +649,8 @@ final class AppStore {
         await refreshAHL()
         await refreshMestis()
         await refreshSwe()
+        await refreshNL()
+        await refreshGoalies()
         notifyArmed = true
         if hasEPKey, force || lastEPFetch == nil || Date().timeIntervalSince(lastEPFetch ?? .distantPast) > 7200 {
             await refreshEP()
@@ -1094,7 +1119,7 @@ final class AppStore {
             rebuild()
             ok += 1
         }
-        recentCache.removeAll()
+        clearRecentCache()
         if ok > 0 {
             sweStatus = "SHL/HA päivitetty " + AppStore.timeString(Date())
         } else if let ts = state.liveSwe?.values.map(\.timestamp).max() {
@@ -1111,6 +1136,7 @@ final class AppStore {
         switch p.league {
         case .nhl: return state.live?.hot?.contains(k) ?? false
         case .liiga: return state.liveLiiga?.hot?.contains(k) ?? false
+        case .nl: return state.liveNL?.hot?.contains(k) ?? false
         case .shl, .allsvenskan: return state.liveSwe?[p.league.rawValue]?.hot.contains(p.team + "|" + k) ?? false
         default: return false
         }
@@ -1168,6 +1194,7 @@ final class AppStore {
     }
 
     @ObservationIgnored private var recentCache: [String: (Date, RecentResult)] = [:]
+    func clearRecentCache() { recentCache.removeAll(); recentVersion += 1 }
 
     /// Pelaajan viimeisimmät (enintään 5) pelit. NHL: ottelulogi rajapinnasta; Liiga: ottelut, joissa pelaaja teki pisteen.
     func recentGames(for p: Player) async -> RecentResult {
@@ -1225,6 +1252,14 @@ final class AppStore {
                 result.note = "Swehockey: joukkueen viimeiset 5 ottelua. Laukauksia ei saada pelaajakohtaisesti, eikä poissaolo erotu pisteettömästä ottelusta."
             } else {
                 result.note = "SHL/HA-pelaajatietoja ei ole vielä haettu. Paina Päivitä."
+            }
+        case .nl:
+            let mine = state.liveNL?.recent?[AppStore.norm(p.name)] ?? []
+            if let tl = state.liveNL?.teamRecent?[p.team], !tl.isEmpty {
+                result.games = tl.map { tg in mine.first(where: { $0.id == tg.id }) ?? tg }
+                result.note = "National League: joukkueen viimeiset 5 ottelua. Rajapinta ei kerro, pelasiko pelaaja kaikissa, joten pisteetön ottelu voi olla myös poissaolo."
+            } else {
+                result.note = "National League -pelitietoja ei ole vielä haettu. Paina Päivitä."
             }
         case .ahl:
             result.note = "Pelikohtaisia tietoja ei ole saatavilla tälle sarjalle."

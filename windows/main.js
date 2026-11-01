@@ -71,15 +71,26 @@ app.whenReady().then(() => {
   let logoIndex = null;
   const readLogoIndex = () => { if (!logoIndex) { try { logoIndex = JSON.parse(fs.readFileSync(logoIndexFile(), 'utf8')); } catch { logoIndex = {}; } } return logoIndex; };
   const logoExt = mime => /svg/.test(mime) ? 'svg' : /webp/.test(mime) ? 'webp' : /jpe?g/.test(mime) ? 'jpg' : /gif/.test(mime) ? 'gif' : 'png';
+  // Iso logo pienennetään tarkasti (nativeImage, paras laatu), jotta pienenä näytettynä se ei ole epätarkka.
+  const shrinkLogo = data => { try { const img = nativeImage.createFromBuffer(data); if (img.isEmpty()) return null; const sz = img.getSize(); if (sz.width <= 256) return null; return img.resize({ width: 256, quality: 'best' }).toPNG(); } catch { return null; } };
   ipcMain.handle('logo:index', () => {
     const idx = readLogoIndex(), out = {};
-    for (const [url, f] of Object.entries(idx)) { const p = path.join(logoDir(), f); if (fs.existsSync(p)) out[url] = require('url').pathToFileURL(p).href; }
+    if (!idx.__v2) {
+      for (const [url, f] of Object.entries(idx)) {
+        if (!/\.(png|jpg)$/.test(f)) continue;
+        try { const p = path.join(logoDir(), f), r = shrinkLogo(fs.readFileSync(p)); if (r) { const nf = f.replace(/\.(png|jpg)$/, '.png'); fs.writeFileSync(path.join(logoDir(), nf), r); idx[url] = nf; } } catch {}
+      }
+      idx.__v2 = true; try { fs.writeFileSync(logoIndexFile(), JSON.stringify(idx)); } catch {}
+    }
+    for (const [url, f] of Object.entries(idx)) { if (typeof f !== 'string') continue; const p = path.join(logoDir(), f); if (fs.existsSync(p)) out[url] = require('url').pathToFileURL(p).href; }
     return out;
   });
   ipcMain.handle('logo:store', (_e, url, buf, mime) => {
     try {
-      const f = crypto.createHash('sha1').update(String(url)).digest('hex') + '.' + logoExt(String(mime || ''));
-      const p = path.join(logoDir(), f); fs.writeFileSync(p, Buffer.from(buf));
+      let ext = logoExt(String(mime || '')), data = Buffer.from(buf);
+      if (ext === 'png' || ext === 'jpg') { const r = shrinkLogo(data); if (r) { data = r; ext = 'png'; } }
+      const f = crypto.createHash('sha1').update(String(url)).digest('hex') + '.' + ext;
+      const p = path.join(logoDir(), f); fs.writeFileSync(p, data);
       const idx = readLogoIndex(); idx[url] = f; fs.writeFileSync(logoIndexFile(), JSON.stringify(idx));
       return require('url').pathToFileURL(p).href;
     } catch { return null; }
@@ -99,7 +110,7 @@ app.whenReady().then(() => {
     try {
       const u = new URL(url); if (u.protocol !== 'https:') return null;
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeout || 30000);
-      try { const r = await net.fetch(url, { signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' } }); if (r.status !== 200) return { status: r.status, text: null }; return { status: 200, text: await r.text() }; }
+      try { const r = await net.fetch(url, { signal: ctl.signal, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*', ...(u.hostname === 'data.sihf.ch' ? { Referer: 'https://www.nationalleague.ch/' } : {}) } }); if (r.status !== 200) return { status: r.status, text: null }; return { status: 200, text: await r.text() }; }
       finally { clearTimeout(t); }
     } catch (e) { return { status: 0, text: null, err: String(e && e.message || e) }; }
   });

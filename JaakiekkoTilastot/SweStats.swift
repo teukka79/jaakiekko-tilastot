@@ -308,3 +308,47 @@ func aggregateSwe(league: League, teams: [Team], games: [SweGame], cache: [Strin
     }
     return SweSnapshot(byName: byName, teamGames: teamGames, teamRecent: teamRecent, recent: recent, hot: hot, timestamp: Date())
 }
+
+
+// MARK: Yksittäisen ottelun maalit (ottelunäkymä)
+
+/// Hakee ottelun maalit, syöttäjät ja ylivoimamaalit Swehockeyn ottelutapahtumista.
+@MainActor
+func fetchSweGameDetail(gid: String, extra: String?) async -> LiigaGameDetail? {
+    guard let html = await sweFetchHTML("\(sweBase)/Game/Events/\(gid)", timeout: 30) else { return nil }
+    struct Row { var min: Int; var sec: Int; var hs: Int; var aw: Int; var type: String; var detail: String }
+    var rows: [Row] = []
+    var seen = Set<String>()
+    for chunk in html.components(separatedBy: "<tr").dropFirst() {
+        var c = chunk
+        if let r = c.range(of: "</tr>") { c = String(c[..<r.lowerBound]) }
+        if let g = c.firstIndex(of: ">") { c = String(c[c.index(after: g)...]) }
+        let t = sweText(c)
+        if t.isEmpty { continue }
+        if let m = sweMatches("^([0-9]+):([0-9]+) ([0-9]+)-([0-9]+) \\(([A-Z]+[0-9]?)\\) (\\S+) (.*)$", in: t).first, m.count > 7 {
+            if seen.insert(t).inserted {
+                rows.append(Row(min: Int(m[1]) ?? 0, sec: Int(m[2]) ?? 0, hs: Int(m[3]) ?? 0, aw: Int(m[4]) ?? 0, type: m[5], detail: m[7]))
+            }
+        }
+    }
+    guard !rows.isEmpty else { return nil }
+    rows.sort { ($0.hs + $0.aw) < ($1.hs + $1.aw) }
+    var d = LiigaGameDetail()
+    var ph = 0
+    for r in rows {
+        let home = r.hs > ph
+        ph = r.hs
+        let main = (r.detail.range(of: "Pos. Part.").map { String(r.detail[..<$0.lowerBound]) } ?? r.detail).trimmingCharacters(in: .whitespaces)
+        guard let sm = sweMatches("^([0-9]+)\\.\\s+(.+?)\\s+\\(([0-9]+)\\)\\s*(.*)$", in: main).first, sm.count > 4 else { continue }
+        var assists: [String] = []
+        for x in sweMatches("([0-9]+)\\.\\s+([^0-9]+?)\\s*(?=[0-9]+\\.\\s|$)", in: sm[4]) where x.count > 2 {
+            assists.append(sweName(x[2]))
+        }
+        let secs = r.min * 60 + r.sec
+        let period = r.type == "PS" ? 5 : (secs >= 3600 ? 4 : secs / 1200 + 1)
+        d.goals.append(LiigaGoalLine(seconds: secs, period: period, home: home, scorer: sweName(sm[2]), assists: assists,
+                                     homeScore: r.hs, awayScore: r.aw, powerPlay: r.type.hasPrefix("PP")))
+    }
+    if extra == "RL" { d.resultNote = "Ratkesi rankkarikisassa" } else if extra == "JA" { d.resultNote = "Ratkesi jatkoajalla" }
+    return d
+}

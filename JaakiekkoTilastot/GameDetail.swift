@@ -48,6 +48,12 @@ struct GameDetailView: View {
     @State private var loading = true
     @State private var failed = false
     @State private var box: NHLBoxscore?
+    @State private var nhl: NHLExtras?
+    @State private var videoItem: VideoItem?
+    @State private var tab = 0
+    private var isLiigaGame: Bool { game.id.hasPrefix("liiga-") }
+    private var isNHLGame: Bool { game.gameId != nil }
+    private var nhlStarted: Bool { isNHLGame && (game.final || game.live) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -58,19 +64,35 @@ struct GameDetailView: View {
                     .buttonStyle(.plain).foregroundStyle(Theme.muted)
             }
 
-            HStack(spacing: 14) {
-                headerTeam(game.away, score: box?.awayTeam?.score ?? game.awayScore)
-                Text("–").foregroundStyle(Theme.muted)
-                headerTeam(game.home, score: box?.homeTeam?.score ?? game.homeScore)
+            HStack(spacing: 12) {
+                Text(game.home).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                TeamLogoView(team: game.home, size: 40).frame(width: 40, height: 34)
+                ScorePill(home: box?.homeTeam?.score ?? game.homeScore, away: box?.awayTeam?.score ?? game.awayScore, size: .large, amber: true)
+                TeamLogoView(team: game.away, size: 40).frame(width: 40, height: 34)
+                Text(game.away).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             Text(statusText).font(.system(size: 12)).foregroundStyle(Theme.muted)
 
-            if loading {
+            if !game.final || isLiigaGame || nhlStarted {
+                let tabCount = 1 + (game.final ? 0 : 2) + ((isLiigaGame || nhlStarted) ? 1 : 0) + (nhlStarted ? 1 : 0)
+                GradientSegmented(selection: $tab, items: tabItems)
+                    .frame(width: CGFloat(tabCount) * 110)
+            }
+
+            if tab == 3 && (isLiigaGame || nhlStarted) {
+                LineupView(game: game, nhlGameId: nhlStarted ? game.gameId : nil)
+            } else if tab >= 1 && tab <= 2 && !game.final {
+                TipsView(game: game, coupons: tab == 2, onEdit: { tab = 1 })
+            } else if tab == 0 && !game.final && !game.live {
+                MatchPreviewView(game: game)
+            } else if loading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if failed {
                 Text("Ottelun tietojen haku epäonnistui.").foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let d = game.liiga {
+            } else if let d = game.liiga, !(nhlStarted && tab == 4) {
                 liigaBody(d)
             } else if let s = box?.playerByGameStats, let a = s.awayTeam, let h = s.homeTeam, !(a.isEmpty && h.isEmpty) {
                 ScrollView(.vertical, showsIndicators: false) {
@@ -93,19 +115,52 @@ struct GameDetailView: View {
         .padding(20)
         .frame(width: 660, height: 780)
         .background(AppBackground())
+        .sheet(item: $videoItem) { VideoSheet(url: $0.url) }
         .task {
-            if game.liiga == nil { await load() } else { loading = false }
+            if game.liiga == nil, let gid = game.sweGid {
+                if let d = await fetchSweGameDetail(gid: gid, extra: game.sweExtra) { game.liiga = d } else { failed = true }
+                loading = false
+            } else if game.liiga == nil { await load() } else { loading = false }
             // Käynnissä olevan ottelun tiedot päivittyvät 20 s välein
             while !Task.isCancelled && (game.live || (!game.final && game.date.timeIntervalSinceNow < 600)) {
                 try? await Task.sleep(for: .seconds(20))
                 if Task.isCancelled { break }
-                if game.liiga != nil || game.id.hasPrefix("liiga") {
-                    if let list = await fetchLiigaSchedule(teams: store.teams), let g = list.first(where: { $0.id == game.id }) { game = g }
-                } else if game.gameId != nil {
+                if game.gameId != nil {
                     await load(silent: true)
+                } else if game.liiga != nil || game.id.hasPrefix("liiga") {
+                    if let list = await fetchLiigaSchedule(teams: store.teams), let g = list.first(where: { $0.id == game.id }) { game = g }
                 }
             }
         }
+    }
+
+    private var tabItems: [(Int, String, String?)] {
+        var out: [(Int, String, String?)] = [(0, "Ottelu", nil)]
+        if !game.final {
+            out.append((1, "Vihjeet", nil))
+            out.append((2, "Kupongit", nil))
+        }
+        if isLiigaGame || nhlStarted { out.append((3, "Kokoonpano", nil)) }
+        if nhlStarted { out.append((4, "Pelaajat", nil)) }
+        return out
+    }
+
+    private var goalieLines: [NHLGoalieLine] {
+        guard let s = box?.playerByGameStats else { return [] }
+        var out: [NHLGoalieLine] = []
+        let sides: [(Bool, NHLBoxscore.TeamStats?)] = [(true, s.homeTeam), (false, s.awayTeam)]
+        for (isHome, ts) in sides {
+            for g in ts?.goalies ?? [] where (g.toi ?? "00:00") != "00:00" {
+                guard let sv = g.saveShotsAgainst else { continue }
+                let parts = sv.split(separator: "/").compactMap { Double($0) }
+                var pct = ""
+                if parts.count == 2, parts[1] > 0 {
+                    pct = String(format: " · %.1f %%", parts[0] / parts[1] * 100).replacingOccurrences(of: ".", with: ",")
+                }
+                out.append(NHLGoalieLine(home: isHome, name: g.name?.default ?? "?", line: sv + pct))
+            }
+        }
+        return out
     }
 
     private func periodTitle(_ p: Int) -> String {
@@ -134,6 +189,10 @@ struct GameDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+                if let ex = nhl, !ex.periods.isEmpty {
+                    NHLPeriodCard(home: game.home, away: game.away, ex: ex)
+                }
+
                 VStack(alignment: .leading, spacing: 0) {
                     SectionLabel("Maalit").padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
                     if d.goals.isEmpty {
@@ -143,43 +202,98 @@ struct GameDetailView: View {
                     ForEach(Array(d.goals.enumerated()), id: \.offset) { idx, g in
                         VStack(alignment: .leading, spacing: 0) {
                             if idx == 0 || d.goals[idx - 1].period != g.period {
-                                Text(periodTitle(g.period)).font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Theme.muted).padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 2)
+                                Text(periodTitle(g.period)).font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Theme.text).padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 2)
                             }
                             HStack(spacing: 10) {
-                                Text(clock(g.seconds)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.muted)
+                                Text(clock(g.seconds - (g.period - 1) * 1200)).font(.system(size: 12).monospacedDigit()).foregroundStyle(Theme.muted)
                                     .frame(width: 44, alignment: .leading)
-                                TeamLogoView(team: g.home ? game.home : game.away, size: 24).frame(width: 24, height: 22)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(g.scorer).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
+                                TeamLogoView(team: g.home ? game.home : game.away, size: 34).frame(width: 36, height: 34)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(g.scorer).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text)
+                                        ForEach(g.tags.isEmpty && g.powerPlay ? ["YV"] : g.tags, id: \.self) { t in
+                                            let c: Color = t == "YV" ? Theme.amber : (t == "AV" ? Theme.red : (t == "TM" ? Theme.green : Theme.cyan))
+                                            Text(t).font(.system(size: 9, weight: .bold)).foregroundStyle(c)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(Capsule().fill(c.opacity(0.16)))
+                                                .overlay(Capsule().stroke(c.opacity(0.5), lineWidth: 0.5))
+                                        }
+                                    }
                                     if !g.assists.isEmpty {
                                         Text(g.assists.joined(separator: ", ")).font(.system(size: 11)).foregroundStyle(Theme.muted)
                                     }
                                 }
                                 Spacer(minLength: 0)
-                                if g.powerPlay {
-                                    Text("YV").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.amber)
+                                Group {
+                                    if let v = g.video {
+                                        Button { videoItem = VideoItem(url: v) } label: {
+                                            ZStack {
+                                                Circle().fill(Theme.amber.opacity(0.16))
+                                                Circle().stroke(Theme.amber.opacity(0.5), lineWidth: 1)
+                                                Image(systemName: "play.fill").font(.system(size: 9)).offset(x: 0.5)
+                                            }
+                                            .frame(width: 24, height: 24)
+                                        }
+                                        .buttonStyle(.plain).foregroundStyle(Theme.amber).help("Katso maalin video")
+                                    } else {
+                                        Color.clear
+                                    }
                                 }
+                                .frame(width: 24, height: 24)
                                 if let hs = g.homeScore, let aws = g.awayScore {
-                                    Text("\(aws) – \(hs)").font(.system(size: 13, weight: .bold).monospacedDigit())
-                                        .foregroundStyle(Theme.cyan).frame(width: 56, alignment: .trailing)
+                                    HStack(spacing: 0) {
+                                        Text("\(hs)").padding(.horizontal, 10).padding(.vertical, 4)
+                                            .foregroundStyle(g.home ? goalAccent : Theme.muted)
+                                            .background(g.home ? goalAccent.opacity(0.2) : Color.clear)
+                                        Text("\(aws)").padding(.horizontal, 10).padding(.vertical, 4)
+                                            .foregroundStyle(g.home ? Theme.muted : awayText)
+                                            .background(g.home ? Color.clear : awayAccent.opacity(0.3))
+                                    }
+                                    .font(.system(size: 16, weight: .heavy).monospacedDigit())
+                                    .background(Color.white.opacity(0.06))
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white.opacity(0.1), lineWidth: 1))
                                 }
                             }
-                            .padding(.horizontal, 12).padding(.vertical, 4)
+                            .padding(.leading, 34).padding(.trailing, 12).padding(.vertical, 6)
+                            .frame(minHeight: 44)
+                            .overlay(alignment: .leading) {
+                                ZStack(alignment: .leading) {
+                                    Rectangle().fill(Color.white.opacity(0.12)).frame(width: 2).padding(.leading, 17)
+                                    Circle().fill(g.home ? Theme.amber : Color.clear)
+                                        .overlay(Circle().stroke(Theme.amber, lineWidth: 2))
+                                        .frame(width: 10, height: 10).padding(.leading, 13)
+                                }
+                            }
                         }
                     }
                 }
                 .padding(.bottom, 6)
                 .glassCard(radius: 12)
 
-                Text("Liigan rajapinta ei kerro kokoonpanoja tai kentällisiä.")
-                    .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                if let ex = nhl {
+                    if !ex.shootout.isEmpty { NHLShootoutCard(home: game.home, away: game.away, list: ex.shootout) }
+                    if !ex.stats.isEmpty { NHLStatsCard(home: game.home, away: game.away, stats: ex.stats) }
+                    if !ex.penalties.isEmpty { NHLPenaltyCard(home: game.home, away: game.away, penalties: ex.penalties) }
+                    if !ex.stars.isEmpty || !goalieLines.isEmpty {
+                        NHLStarsCard(home: game.home, away: game.away, stars: ex.stars, goalies: goalieLines)
+                    }
+                }
+
+                if game.id.hasPrefix("liiga-") {
+                    Text("Liigan rajapinta ei kerro kokoonpanoja tai kentällisiä.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                }
             }
         }
     }
 
     private var statusText: String {
-        if game.final { return "Päättynyt" }
+        if game.final {
+            if let o = nhl?.outcome { return "Päättynyt · \(o)" }
+            return "Päättynyt"
+        }
         if game.live { return "Käynnissä" }
         let f = DateFormatter()
         f.locale = Locale(identifier: "fi_FI")
@@ -187,11 +301,23 @@ struct GameDetailView: View {
         return f.string(from: game.date)
     }
 
-    private func headerTeam(_ name: String, score: Int?) -> some View {
-        HStack(spacing: 10) {
-            TeamLogoView(team: name, size: 40).frame(width: 40, height: 34)
-            Text(name).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+    /// Kotijoukkue vasemmalla: nimi, logo, maalit – maalit, logo, nimi (vierasjoukkue oikealla).
+    private func headerTeam(_ name: String, score: Int?, homeSide: Bool) -> some View {
+        let scoreText = Group {
             if let score { Text("\(score)").font(.system(size: 22, weight: .bold).monospacedDigit()).foregroundStyle(Theme.cyan) }
+        }
+        let nameText = Text(name).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+        let logo = TeamLogoView(team: name, size: 40).frame(width: 40, height: 34)
+        return HStack(spacing: 10) {
+            if homeSide {
+                nameText.frame(maxWidth: .infinity, alignment: .trailing)
+                logo
+                scoreText
+            } else {
+                scoreText
+                logo
+                nameText.frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -267,6 +393,11 @@ struct GameDetailView: View {
             box = b
         } else if !silent {
             failed = true
+        }
+        // Maalit, syöttäjät ja ylivoimat play-by-playsta (Ottelu-välilehti)
+        if let b = await fetchNHLGameBundle(gameId: id) {
+            game.liiga = b.detail
+            nhl = b.extras
         }
         loading = false
     }

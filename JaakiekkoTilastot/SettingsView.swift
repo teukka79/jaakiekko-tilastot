@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
+    @State private var oddsKey = ""
     @State private var soundError: String?
 
     private func pickSound() {
@@ -82,6 +83,19 @@ struct SettingsView: View {
                         .font(.system(size: 11)).foregroundStyle(store.epOK ? Theme.green : Theme.amber)
                         .lineLimit(4).textSelection(.enabled)
                 }
+                SectionLabel("Odds API -avain (vedonlyöntikertoimet)")
+                HStack(spacing: 8) {
+                    SecureField(store.hasOddsKey ? "Avain tallennettu – liitä uusi korvataksesi" : "Liitä avain tähän", text: $oddsKey)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    Button("Tallenna") { store.setOddsKey(oddsKey); oddsKey = ""; store.flash("Odds API -avain tallennettu") }
+                        .buttonStyle(GhostButtonStyle()).disabled(oddsKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if store.hasOddsKey { Button("Poista") { store.setOddsKey(""); oddsKey = "" }.buttonStyle(GhostButtonStyle()) }
+                }
+                Text("Kertoimia haetaan vain, kun avaat ottelun Vihjeet-välilehden. Pelaajakohtaiset kertoimet (NHL) maksavat noin 4 kyselyä per ottelu, ja vastaukset säilytetään 30 minuuttia.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.muted)
                 Spacer(minLength: 0)
                 HStack {
                     if store.hasEPKey {
@@ -100,6 +114,6 @@ struct SettingsView: View {
             }
             .padding(24)
         }
-        .frame(width: 540, height: 680)
+        .frame(width: 540, height: 800)
     }
 }

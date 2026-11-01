@@ -13,6 +13,9 @@ struct ScheduleGame: Identifiable {
     var homeScore: Int? = nil
     var awayScore: Int? = nil
     var liiga: LiigaGameDetail? = nil
+    /// SHL/HockeyAllsvenskan: Swehockeyn ottelun tunnus ja päättymistapa (JA/RL) lisätietojen hakua varten.
+    var sweGid: String? = nil
+    var sweExtra: String? = nil
 }
 
 struct LiigaGoalLine {
@@ -24,6 +27,8 @@ struct LiigaGoalLine {
     let homeScore: Int?
     let awayScore: Int?
     let powerPlay: Bool
+    var tags: [String] = []
+    var video: URL? = nil
 }
 
 struct LiigaGameDetail {
@@ -181,11 +186,13 @@ struct ScheduleView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    @State private var league: League = .nhl
+    @State private var league: League
     @State private var games: [ScheduleGame] = []
     @State private var loading = false
     @State private var failed = false
     @State private var selected: ScheduleGame?
+
+    init(initial: League = .nhl) { _league = State(initialValue: initial) }
 
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -225,11 +232,12 @@ struct ScheduleView: View {
                     .buttonStyle(.plain).foregroundStyle(Theme.muted)
             }
             HStack(spacing: 8) {
-                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan]) { l in
-                    Button(l.label) { league = l }.buttonStyle(GhostButtonStyle(active: league == l))
+                ForEach([League.nhl, League.ahl, League.liiga, League.mestis, League.shl, League.allsvenskan, League.nl]) { l in
+                    Button(l.label) { league = l }
+                        .buttonStyle(GhostButtonStyle(active: league == l))
+                        .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                 }
                 Spacer()
-                Text("Vieras – Koti · ajat omassa aikavyöhykkeessäsi").font(.system(size: 11)).foregroundStyle(Theme.muted)
             }
 
             if loading {
@@ -278,7 +286,7 @@ struct ScheduleView: View {
 
     @ViewBuilder
     private func gameRow(_ g: ScheduleGame, odd: Bool) -> some View {
-        if g.gameId != nil || g.liiga != nil {
+        if g.gameId != nil || g.liiga != nil || g.sweGid != nil || !g.final {
             Button { selected = g } label: { rowContent(g, odd: odd) }.buttonStyle(.plain)
         } else {
             rowContent(g, odd: odd)
@@ -288,20 +296,20 @@ struct ScheduleView: View {
     private func rowContent(_ g: ScheduleGame, odd: Bool) -> some View {
         HStack(spacing: 10) {
             Text(g.final ? "Päättynyt" : g.live ? "Käynnissä" : ScheduleView.timeFormatter.string(from: g.date))
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(g.live ? Theme.green : Theme.muted)
+                .font(.system(size: 12, weight: g.final ? .medium : .bold).monospacedDigit())
+                .foregroundStyle(g.live ? Theme.green : (g.final ? Color(hex: 0x64748B) : Theme.amber))
                 .frame(width: 74, alignment: .leading)
-            Text(g.away).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            TeamLogoView(team: g.away, size: 30).frame(width: 30, height: 26)
-            if g.final || g.live, let a = g.awayScore, let h = g.homeScore {
-                Text("\(a) – \(h)").font(.system(size: 13, weight: .bold).monospacedDigit()).foregroundStyle(Theme.cyan)
-                    .frame(width: 56)
-            } else {
-                Text("–").foregroundStyle(Theme.muted).frame(width: 56)
-            }
-            TeamLogoView(team: g.home, size: 30).frame(width: 30, height: 26)
             Text(g.home).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            TeamLogoView(team: g.home, size: 30).frame(width: 30, height: 26)
+            if g.final || g.live, let a = g.awayScore, let h = g.homeScore {
+                ScorePill(home: h, away: a, size: .medium, amber: true)
+                    .frame(width: 72)
+            } else {
+                Text("–").foregroundStyle(Theme.muted).frame(width: 72)
+            }
+            TeamLogoView(team: g.away, size: 30).frame(width: 30, height: 26)
+            Text(g.away).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
@@ -327,6 +335,7 @@ struct ScheduleView: View {
         case .mestis: r = await fetchMestisSchedule(teams: store.teams)
         case .ahl: r = await fetchAHLSchedule(teams: store.teams)
         case .shl, .allsvenskan: r = await fetchSweSchedule(league: league, teams: store.teams)
+        case .nl: r = await fetchNLSchedule(teams: store.teams)
         default: r = await fetchLiigaSchedule(teams: store.teams)
         }
         if let r { games = r } else if !silent { failed = true }

@@ -13,7 +13,7 @@ extension Color {
 }
 
 enum Theme {
-    static let cyan = Color(hex: 0x22D3EE)
+    static let cyan = Color(hex: 0x46C9F5)
     static let cyanDeep = Color(hex: 0x0E7490)
     static let blue = Color(hex: 0x2563EB)
     static let indigo = Color(hex: 0x6366F1)
@@ -22,6 +22,8 @@ enum Theme {
     static let red = Color(hex: 0xF87171)
     static let text = Color(hex: 0xF1F5F9)
     static let muted = Color(hex: 0x94A3B8)
+    /// Liekkikuvake: ylhäältä kulta, alhaalta punainen.
+    static let flame = LinearGradient(colors: [Color(hex: 0xFBBF24), Color(hex: 0xEF4444)], startPoint: .top, endPoint: .bottom)
     static let hairline = Color(hex: 0x93C5FD, opacity: 0.12)
 
     static let accentGradient = LinearGradient(
@@ -34,7 +36,7 @@ struct AppBackground: View {
         ZStack {
             LinearGradient(colors: [Color(hex: 0x08112A), Color(hex: 0x050A18), Color(hex: 0x030612)],
                            startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [Color(hex: 0x22D3EE, opacity: 0.16), .clear],
+            RadialGradient(colors: [Color(hex: 0x46C9F5, opacity: 0.16), .clear],
                            center: .topLeading, startRadius: 0, endRadius: 650)
             RadialGradient(colors: [Color(hex: 0x6366F1, opacity: 0.18), .clear],
                            center: .topTrailing, startRadius: 0, endRadius: 650)
@@ -112,5 +114,40 @@ struct TeamBadge: View {
                             in: RoundedRectangle(cornerRadius: geo.size.width * 0.22, style: .continuous))
         }
         .accessibilityHidden(true)
+    }
+}
+
+
+/// Segmenttivalitsin, jonka valittu kohta käyttää samaa liukuväriä kuin nappulat. Muoto vastaa macOS:n segmenttivalitsinta.
+struct GradientSegmented<T: Hashable>: View {
+    @Binding var selection: T
+    let items: [(T, String, String?)]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(items.indices, id: \.self) { i in
+                let it = items[i]
+                let on = it.0 == selection
+                Button { selection = it.0 } label: {
+                    HStack(spacing: 5) {
+                        if let ic = it.2 { Image(systemName: ic) }
+                        Text(it.1)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(on ? Color.white : Color(hex: 0xCBD5E1))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(on ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.clear))
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }

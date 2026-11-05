@@ -1,7 +1,7 @@
 {
   "name": "jaakiekko-pisteporssi",
   "productName": "Jääkiekko Tilastot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Jääkiekko Tilastot 2026/2027",
   "main": "main.js",
   "author": "Teukka",
@@ -41,12 +41,22 @@
       "installerHeaderIcon": "icons/icon.ico"
     },
     "afterPack": "afterPack.js",
-    "artifactName": "Jaakiekko-Tilastot-Asennus-${version}.${ext}"
+    "artifactName": "Jaakiekko-Tilastot-Asennus-${version}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "teukka79",
+        "repo": "jaakiekko-tilastot"
+      }
+    ]
   },
   "devDependencies": {
     "country-flag-emoji-polyfill": "^0.1.10",
     "electron": "33.2.1",
     "electron-builder": "25.1.8",
     "resedit": "^2.0.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }

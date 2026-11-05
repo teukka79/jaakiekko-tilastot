@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum SortKey: String, CaseIterable {
-    case name, number, nat, slot, team, games, goals, assists, points, ppg, shots, pp, plusMinus, rating
+    case name, number, nat, slot, team, games, goals, assists, points, ppg, shots, pp, plusMinus, rating, recent
 }
 
 enum ViewMode { case table, teams }
@@ -54,6 +54,7 @@ struct ContentView: View {
 
     private var visible: [Player] {
         let q = AppStore.norm(search)
+        _ = store.recentVersion   // lajittelu päivittyy, kun viimeisten pelien tiedot latautuvat
         var list = store.players.filter { p in
             (league == nil || p.league == league)
             && (team == nil || p.team == team)
@@ -88,6 +89,11 @@ struct ContentView: View {
             case .rating:
                 let a = store.rating(x.id), b = store.rating(y.id)
                 return a == b ? x.name < y.name : (ascending ? a < b : a > b)
+            case .recent:
+                let m = StripMode(sort: sortKey)
+                let a = store.recentSum(x, mode: m), b = store.recentSum(y, mode: m)
+                if a == b { return cmp(x.points, y.points, x, y) }
+                return cmp(a, b, x, y)
             }
         }
         return list
@@ -350,6 +356,7 @@ struct ContentView: View {
             sortKey = k
             ascending = (k == .name || k == .team || k == .slot || k == .nat)
         }
+        if sortKey == .recent { store.prefetchRecent(visible) }
     }
 
     private var table: some View {
@@ -358,10 +365,20 @@ struct ContentView: View {
                 Color.clear.frame(width: 22, height: 1)
                 ForEach(cols) { c in
                     if c.key == .rating {
-                        Text("Viim. 5: \(StripMode(sort: sortKey).label)")
-                            .font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.muted)
-                            .lineLimit(1).frame(width: 156)
-                            .help("Viimeisten pelien jakauma. Luku seuraa lajittelua: maalit, syötöt, ylivoima tai laukaukset; muuten pisteet.")
+                        Button { toggleSort(.recent) } label: {
+                            HStack(spacing: 3) {
+                                Text("Viim. 5: \(StripMode(sort: sortKey).label)").lineLimit(1)
+                                if sortKey == .recent {
+                                    Image(systemName: ascending ? "chevron.up" : "chevron.down").font(.system(size: 8))
+                                    if store.recentLoading { ProgressView().controlSize(.mini) }
+                                }
+                            }
+                            .frame(width: 156)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(sortKey == .recent ? Theme.cyan : Theme.muted)
+                        .help("Lajittele viiden viimeisen pelin summan mukaan. Luku seuraa lajittelua: maalit, syötöt, ylivoima tai laukaukset; muuten pisteet. Tiedot haetaan listan pelaajille ensimmäisellä kerralla.")
                     }
                     Button { toggleSort(c.key) } label: {
                         HStack(spacing: 3) {

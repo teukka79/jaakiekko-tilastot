@@ -315,9 +315,24 @@ final class AppStore {
         return String(letters).split(separator: " ").joined(separator: " ")
     }
 
-    private func liveFor(_ p: Player) -> (entry: LiveEntry, team: Team?)? {
-        guard p.league == .nhl, let list = state.live?.byName[AppStore.norm(p.name)] else { return nil }
+    private func liveFor(_ p: Player) -> (entry: LiveEntry, team: Team?, key: String)? {
+        guard p.league == .nhl, let live = state.live else { return nil }
         let abbr = teamByName[p.team]?.abbr
+        var key = AppStore.norm(p.name)
+        var found = live.byName[key]
+        if found == nil {
+            // Nimi kirjoitettu eri tavalla (esim. William/Will, Vasili/Vasily): sama sukunimi, sama joukkue, etunimen alku täsmää.
+            let parts = AppStore.norm(p.name).split(separator: " ").map(String.init)
+            if let last = parts.last, let first = parts.first, parts.count >= 2 {
+                let hits = live.byName.filter { key, entries in
+                    let kp = key.split(separator: " ").map(String.init)
+                    guard kp.count >= 2, kp.last == last, let kf = kp.first else { return false }
+                    return kf.commonPrefix(with: first).count >= 3 && entries.contains { $0.abbr == abbr }
+                }
+                if hits.count == 1, let h = hits.first { found = h.value; key = h.key }
+            }
+        }
+        guard let list = found else { return nil }
         let cand = list.filter { e in
             guard let pos = p.pos else { return true }
             return (pos == "D") == (e.pos == "D")
@@ -325,13 +340,14 @@ final class AppStore {
         let match = cand.first(where: { $0.abbr == abbr }) ?? (cand.count == 1 ? cand[0] : nil)
         guard let entry = match else { return nil }
         let moved = entry.abbr != abbr ? teamByAbbr[entry.abbr] : nil
-        return (entry, moved)
+        return (entry, moved, key)
     }
 
     func rebuild() {
         let custom = state.customPlayers.compactMap { $0.toPlayer() }
         var out: [Player] = []
         out.reserveCapacity(seedPlayers.count + custom.count)
+        var matchedLive = Set<String>()
         for base in seedPlayers + custom {
             var p = base
             if p.league == .liiga, let snap = state.liveLiiga, let tg = snap.teamGames, !tg.isEmpty {
@@ -372,7 +388,9 @@ final class AppStore {
                     p.games = sw.teamGames[p.team] ?? p.games
                 }
             }
+            var liveKey = AppStore.norm(p.name)
             if let lv = liveFor(p) {
+                liveKey = lv.key; matchedLive.insert(lv.key)
                 p.games = lv.entry.games; p.goals = lv.entry.goals; p.assists = lv.entry.assists
                 p.pim = lv.entry.pim; p.plusMinus = lv.entry.plusMinus
                 p.shots = lv.entry.shots
@@ -380,7 +398,7 @@ final class AppStore {
                 p.ppPoints = lv.entry.ppPoints
                 if let t = lv.team { p.team = t.name; p.flag = t.flag }
             }
-            if p.league == .nhl, let i = state.live?.info?[AppStore.norm(p.name)] {
+            if p.league == .nhl, let i = state.live?.info?[liveKey] {
                 p.number = i.number
                 if p.nat == nil { p.nat = i.nat }
             } else if p.league == .liiga, let i = state.liveLiiga?.info?[AppStore.norm(p.name)] {
@@ -404,7 +422,7 @@ final class AppStore {
             for (key, list) in snap.byName {
                 for e in list {
                     let tag = "\(League.nhl.rawValue)|\(key)"
-                    guard !have.contains(tag), let name = e.name, let team = teamByAbbr[e.abbr] else { continue }
+                    guard !have.contains(tag), !matchedLive.contains(key), let name = e.name, let team = teamByAbbr[e.abbr] else { continue }
                     have.insert(tag)
                     var p = Player(id: "nhl-\(e.playerId.map(String.init) ?? key)", name: name, team: team.name,
                                    league: .nhl, flag: team.flag, pos: e.pos == "D" ? "D" : "F", nat: nil, born: nil, shoots: nil,
@@ -1194,6 +1212,37 @@ final class AppStore {
     }
 
     @ObservationIgnored private var recentCache: [String: (Date, RecentResult)] = [:]
+    var recentLoading = false
+
+    /// Viiden viimeisen pelin summa välimuistista (nil, jos tietoa ei ole vielä haettu).
+    func recentSum(_ p: Player, mode: StripMode) -> Int? {
+        guard let c = recentCache[p.id], !c.1.games.isEmpty else { return nil }
+        var total = 0, any = false
+        for g in c.1.games.prefix(5) { if let v = mode.value(g) { total += v; any = true } }
+        return any ? total : nil
+    }
+
+    /// Hakee viimeisten pelien tiedot listan pelaajille (enintään 200, kausipisteiden mukaan) lajittelua varten.
+    func prefetchRecent(_ list: [Player]) {
+        let todo = list.sorted { ($0.points ?? 0) > ($1.points ?? 0) }.prefix(200)
+            .filter { recentCache[$0.id] == nil || Date().timeIntervalSince(recentCache[$0.id]!.0) >= 600 }
+        guard !todo.isEmpty, !recentLoading else { return }
+        recentLoading = true
+        Task { [todo] in
+            var n = 0
+            await withTaskGroup(of: Void.self) { group in
+                var it = Array(todo).makeIterator()
+                for _ in 0..<6 { if let p = it.next() { group.addTask { _ = await self.recentGames(for: p) } } }
+                for await _ in group {
+                    n += 1
+                    if n % 10 == 0 { self.recentVersion += 1 }
+                    if let p = it.next() { group.addTask { _ = await self.recentGames(for: p) } }
+                }
+            }
+            self.recentVersion += 1
+            self.recentLoading = false
+        }
+    }
     func clearRecentCache() { recentCache.removeAll(); recentVersion += 1 }
 
     /// Pelaajan viimeisimmät (enintään 5) pelit. NHL: ottelulogi rajapinnasta; Liiga: ottelut, joissa pelaaja teki pisteen.

@@ -51,7 +51,7 @@ struct CompareView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             AppBackground()
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -85,8 +85,9 @@ struct CompareView: View {
                     }
                 }
 
+                ScrollView {
                 VStack(spacing: 0) {
-                    ForEach(gMetrics) { m in
+                    ForEach(isGoalie ? gMetrics : []) { m in
                         let values = goalies.compactMap(m.value)
                         let best = values.max()
                         HStack(spacing: 12) {
@@ -124,10 +125,10 @@ struct CompareView: View {
                     }
                 }
                 .glassCard()
-                Spacer(minLength: 0)
+                }
             }
             .padding(24)
         }
-        .frame(width: 720, height: 560)
+        .frame(width: 720, height: 600)
     }
 }

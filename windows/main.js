@@ -135,6 +135,26 @@ app.whenReady().then(() => {
     return { name: path.basename(r.filePaths[0]), data: fs.readFileSync(r.filePaths[0]) };
   });
   createWindow();
+  // ----- Automaattinen päivitys (GitHub Releases) -----
+  if (app.isPackaged) {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      autoUpdater.autoDownload = true;
+      autoUpdater.autoInstallOnAppQuit = true;
+      autoUpdater.on('error', () => {});
+      autoUpdater.on('update-downloaded', async info => {
+        const r = await dialog.showMessageBox(win, {
+          type: 'info', buttons: ['Asenna ja käynnistä uudelleen', 'Myöhemmin'], defaultId: 0, cancelId: 1,
+          title: 'Päivitys valmis', message: `Uusi versio ${info.version} on ladattu.`,
+          detail: 'Päivitys asennetaan, kun käynnistät ohjelman uudelleen. Voit myös asentaa sen heti.'
+        });
+        if (r.response === 0) autoUpdater.quitAndInstall();
+      });
+      const check = () => { try { autoUpdater.checkForUpdates().catch(() => {}); } catch {} };
+      setTimeout(check, 8000);
+      setInterval(check, 6 * 60 * 60 * 1000);
+    } catch {}
+  }
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => app.quit());
